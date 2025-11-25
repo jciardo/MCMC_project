@@ -16,6 +16,7 @@ The solver uses the Metropolis-Hastings MCMC algorithm to find valid configurati
 import random
 import argparse
 import sys
+import math
 from typing import List, Tuple, Set
 
 
@@ -212,7 +213,7 @@ def mcmc_solve(n: int, max_iterations: int = 1000000, temperature: float = 1.0,
         if delta <= 0:
             # Accept move (improves or maintains solution)
             current_conflicts = new_conflicts
-        elif temp > 0 and random.random() < pow(2.71828, -delta / temp):
+        elif temp > 0 and random.random() < math.exp(-delta / temp):
             # Accept worse move with probability
             current_conflicts = new_conflicts
         else:
