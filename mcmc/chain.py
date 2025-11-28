@@ -45,13 +45,12 @@ class MCMCChain:
             # ? Accept the move
             if isinstance(move, SingleStackMove):
                 # ? Update state
-                self.state.set_height(move.i, move.j, move.k_new)
+                self.energy_model.apply_move(
+                    self.state, move.i, move.j, move.k_new, delta_E
+                )
             elif isinstance(move, SingleConstraintStackMove):
                 # ? Swap heights in constrained stacks
                 k1 = self.state.get_height(move.i1, move.j)
                 k2 = self.state.get_height(move.i2, move.j)
                 self.state.set_height(move.i1, move.j, k2)
                 self.state.set_height(move.i2, move.j, k1)
-
-            # ? Update energy model
-            self.energy_model.current_energy += delta_E
