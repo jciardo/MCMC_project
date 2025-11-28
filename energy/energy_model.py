@@ -122,7 +122,7 @@ class EnergyModel:
                 in_new = line_id in new_set
                 
                 #old : delta_E += nchoose2(new_c) - nchoose2(c)
-                delta_E += self.line_delta_energy(line_id, in_old, in_new)
+                delta_E += self._line_delta_energy(line_id, in_old, in_new)
 
 
         #! Update line count

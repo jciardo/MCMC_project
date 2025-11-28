@@ -17,6 +17,7 @@ class SingleStackMove:
     k_old: int #! [1, ..., N] (current height)
     k_new: int #! [1, ..., N] (proposed new height)
 
+
 class Proposal(ABC):
     """
     Abstract base class for move generators
