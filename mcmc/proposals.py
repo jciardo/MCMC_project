@@ -35,6 +35,7 @@ class SingleConstraintStackMove:
     k2: int  #! [1, ..., N] (height of stack i2)
 
 
+
 class Proposal(ABC):
     """
     Abstract base class for move generators

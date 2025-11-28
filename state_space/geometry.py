@@ -29,14 +29,39 @@ class Board:
         j0, k0 = divmod(rem, N)
         return (i0 + 1, j0 + 1, k0 + 1)
 
-    def queen_directions(self, include_vertical: bool = False) -> List[Coord3D]:
+    def queen_directions(
+        self, include_vertical: bool = False, constraint: bool = False
+    ) -> List[Coord3D]:
+        """
+        Return queen directions in 3D.
+        If constraint=True, keep only:
+            - diagonals (at least 2 components non-zero)
+            - attacks along j-axis (0, ±1, 0)
+        Otherwise, return all directions (with optional verticals).
+        """
         dirs: List[Coord3D] = []
 
         for a in (-1, 0, 1):
             for b in (-1, 0, 1):
                 for c in (-1, 0, 1):
+
                     if (a, b, c) == (0, 0, 0):
                         continue
+
+                    if constraint:
+                        non_zero = (a != 0) + (b != 0) + (c != 0)
+                        # Garder les diagonales
+                        if non_zero >= 2:
+                            dirs.append((a, b, c))
+                            continue
+                        # Garder l'axe j pur
+                        if (a, b, c) == (0, 1, 0) or (a, b, c) == (0, -1, 0):
+                            dirs.append((a, b, c))
+                            continue
+                        # Sinon, on ignore
+                        continue
+
+                    # Mode normal : inclure toutes directions sauf axes i purs et éventuellement verticales
                     if not include_vertical and (a, b, c) in ((0, 0, 1), (0, 0, -1)):
                         continue
                     dirs.append((a, b, c))
