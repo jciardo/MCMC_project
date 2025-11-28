@@ -4,12 +4,10 @@ from typing import Tuple, List, Dict
 
 Coord3D = Tuple[int, int, int]
 
+
 @dataclass(frozen=True)
 class Board:
     N: int
-
-    def __init__(self, N):
-        self.N = N
 
     def is_valid_coord(self, i: int, j: int, k: int) -> bool:
         return 1 <= i <= self.N and 1 <= j <= self.N and 1 <= k <= self.N
@@ -27,7 +25,7 @@ class Board:
         id -> coordinate
         """
         N = self.N
-        i0, rem = divmod(cell_id, N * N) #! quotient and remainder
+        i0, rem = divmod(cell_id, N * N)  #! quotient and remainder
         j0, k0 = divmod(rem, N)
         return (i0 + 1, j0 + 1, k0 + 1)
 
@@ -43,7 +41,6 @@ class Board:
                         continue
                     dirs.append((a, b, c))
         return dirs
-    
 
 
 @dataclass
@@ -51,18 +48,23 @@ class LineIndex:
     """
     Precomputes all the attack lines on the 3D board
     """
+
     geometry: Board
     directions: List[Coord3D]
 
     #! Filled by build
-    lines: List[List[int]] #! Each line is a list of linear cell indices along a straight move line
-    cell_to_lines: List[List[int]] #! Inverse mapping : which lines pass through a given cell
+    lines: List[
+        List[int]
+    ]  #! Each line is a list of linear cell indices along a straight move line
+    cell_to_lines: List[
+        List[int]
+    ]  #! Inverse mapping : which lines pass through a given cell
 
     def __init__(self, geometry: Board, include_vertical):
         self.geometry = geometry
         self.directions = geometry.queen_directions(include_vertical=include_vertical)
         self.lines = []
-        self.cell_to_lines = [[] for _ in range(geometry.num_cells)]
+        self.cell_to_lines = [[] for _ in range(geometry.N**3)]
         self._build()
 
     def _build(self):
@@ -72,12 +74,12 @@ class LineIndex:
         for i in range(1, N + 1):
             for j in range(1, N + 1):
                 for k in range(1, N + 1):
-                    for (a, b, c) in self.directions:
-                        
-                        #! A cell is a valid start of line if going backward by the direction vector steps out of the cube 
+                    for a, b, c in self.directions:
+
+                        #! A cell is a valid start of line if going backward by the direction vector steps out of the cube
                         prev_i, prev_j, prev_k = i - a, j - b, k - c
                         if board.is_valid_coord(prev_i, prev_j, prev_k):
-                            continue 
+                            continue
 
                         #! Traces the line
                         cells: List[int] = []

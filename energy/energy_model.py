@@ -6,8 +6,10 @@ from typing import List
 from state_space.states import StackState
 from state_space.geometry import Board, LineIndex
 
+
 def nchoose2(n: int) -> int:
     return (n * (n - 1)) // 2
+
 
 @dataclass
 class EnergyModel:
@@ -15,13 +17,13 @@ class EnergyModel:
     line_index: LineIndex
 
     def __post_init__(self):
-        
+
         #! Nb of lines
         L = len(self.line_index.lines)
-        
+
         #! Count the nb of queens on each line
         self.line_counts = np.zeros(L, dtype=int)
-        
+
         #! Tot energy
         self.current_energy = 0
 
@@ -29,18 +31,18 @@ class EnergyModel:
         """
         Compute line_counts and current_energy from scratch for this state
         """
-        #? zero counts
+        # ? zero counts
         self.line_counts[:] = 0
 
-        #? count queens on each line
-        for (i, j, k) in state.iter_queens():
+        # ? count queens on each line
+        for i, j, k in state.iter_queens():
 
             cell_id = self.geometry.coord_to_id(i, j, k)
             for line_id in self.line_index.cell_to_lines[cell_id]:
 
                 self.line_counts[line_id] += 1
 
-        #? computes energy
+        # ? computes energy
         energy = 0
         for c in self.line_counts:
             if c > 1:
@@ -50,7 +52,7 @@ class EnergyModel:
 
     def get_energy(self) -> int:
         return int(self.current_energy)
-    
+
     def _line_delta_energy(self, line_id, in_old, in_new):
         c = self.line_counts[line_id]
 
@@ -58,6 +60,8 @@ class EnergyModel:
             dc = -1
         elif in_new and not in_old:
             dc = +1
+        else:
+            dc = 0
 
         return nchoose2(c + dc) - nchoose2(c)
 
@@ -92,7 +96,9 @@ class EnergyModel:
 
         return delta_E
 
-    def apply_move(self, state: StackState, i: int, j: int, k_new: int, delta_E) -> None:
+    def apply_move(
+        self, state: StackState, i: int, j: int, k_new: int, delta_E
+    ) -> None:
         """
         Apply the move (i,j,k_old)->(i,j,k_new), updating counts and energy
         """
@@ -120,10 +126,9 @@ class EnergyModel:
             for line_id in old_set.union(new_set):
                 in_old = line_id in old_set
                 in_new = line_id in new_set
-                
-                #old : delta_E += nchoose2(new_c) - nchoose2(c)
-                delta_E += self.line_delta_energy(line_id, in_old, in_new)
 
+                # old : delta_E += nchoose2(new_c) - nchoose2(c)
+                delta_E += self._line_delta_energy(line_id, in_old, in_new)
 
         #! Update line count
         for line_id in old_set.union(new_set):
@@ -134,8 +139,6 @@ class EnergyModel:
             elif in_new and not in_old:
                 self.line_counts[line_id] += 1
 
-
         #! Update energy and state
         self.current_energy += delta_E
         state.set_height(i, j, k_new)
-
