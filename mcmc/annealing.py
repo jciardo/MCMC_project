@@ -1,7 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional
-from mcmc.chain import MCMCChain  # Assuming MCMCChain is available
+from mcmc.chain import MCMCChain  
+from mcmc.proposals import SingleStackMove, SingleConstraintStackMove
 from abc import ABC, abstractmethod
 import numpy as np
 
@@ -55,7 +56,7 @@ class GeometricSchedule(AnnealingSchedule):
             self._current_step += 1
 
     def is_finished(self) -> bool:
-        return self._current_step >= self.max_steps or self._current_T <= 1e-9
+        return self._current_step >= self.max_steps
     
 
 
@@ -118,3 +119,58 @@ def run_simulated_annealing(
         iteration += 1
         
     print("Simulated Annealing complete.")
+
+
+
+def calibrate_initial_temperature(
+    mcmc_chain: 'MCMCChain', 
+    target_acceptance_rate: float = 0.8, 
+    n_samples: int = 1000,
+    rng: np.random.Generator = np.random.default_rng()
+) -> float:
+    """
+    Calibrates the initial temperature T0 for Simulated Annealing (SA).
+    """
+    energy_increases: List[float] = []
+    
+    # Start with a copy of the current state to avoid modifying the chain state
+    current_state = mcmc_chain.state.copy()
+    energy_model = mcmc_chain.energy_model
+    proposal = mcmc_chain.proposal
+
+    # --- 1. Sampling Phase (Pure Random Walk) ---
+    for _ in range(n_samples):
+        
+        # 1a. Propose a move and get the energy difference (Delta E)
+        move, delta_E = proposal.propose(current_state, energy_model, rng)
+       
+        # 1b. Store only moves that cause energy degradation (Delta E > 0)
+        if delta_E > 0:
+            energy_increases.append(delta_E)
+            
+        # 2. Apply the proposed move to create the next state for the random walk. 
+
+        energy_model.apply_move(
+            current_state,
+            *(move.i, move.j, move.k_new) if isinstance(move, SingleStackMove) 
+            else (move.i1, move.i2, move.j, move.k1, move.k2),
+            delta_E
+        )
+                   
+        # 3. Recalculate energy_model's line_counts for the next proposal. 
+        energy_model.initialize(current_state) # Re-initialize the model with the new state
+
+    # --- 2. T0 Calculation ---
+    if not energy_increases: # Check if the list is empty
+        print("Warning: No energy-increasing moves found during sampling. Defaulting T0 to 10.0.")
+        return 10.0
+        
+    mean_energy_increase = np.mean(energy_increases)
+    
+    # 4. Calculate T0 using the inverse Metropolis formula
+    T0 = -mean_energy_increase / np.log(target_acceptance_rate)
+    
+    print(f"Average energy degradation (mean Delta E > 0): {mean_energy_increase:.2f}")
+    print(f"Initial temperature T0 calculated for {target_acceptance_rate*100}% acceptance: {T0:.2f}")
+    
+    return T0
