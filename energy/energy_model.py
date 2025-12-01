@@ -198,4 +198,49 @@ class EnergyModel:
             if any(self.line_counts[line_id] > 1 for line_id in lines):
                 attacked += 1
 
-        return attacked #! check if possible to have more infos ; max conflict nb or else
+        return attacked
+    
+    def attacked_stats(self, state: StackState):
+        """
+        Compute more precise attack stats:
+        - attacked_queens: at least one attacker
+        - max_attacks: maximum number of attackers any queen has
+        - mean_attacks: mean number of attackers among attacked queens
+        - most_attacked_queen: coord of the queen or None
+
+        Returns : dict
+        """
+        board = self.geometry
+        l_id = self.line_index
+
+        attacked_queens = 0
+        total_attacks = 0
+        max_attacks = 0
+        most_attacked_queen = None
+
+        for (i, j, k) in state.iter_queens():
+            cell_id = board.coord_to_id(i, j, k)
+            lines = l_id.cell_to_lines[cell_id]
+
+            #? count how many other queens attack this queen
+            attacks_here = 0
+            for line_id in lines:
+                n = self.line_counts[line_id]
+                if n > 1:
+                    attacks_here += (n - 1)
+
+            if attacks_here > 0:
+                attacked_queens += 1
+                total_attacks += attacks_here
+                if attacks_here > max_attacks:
+                    max_attacks = attacks_here
+                    most_attacked_queen = (i, j, k)
+
+        mean_attacks = (total_attacks / attacked_queens if attacked_queens > 0 else 0.0)
+
+        return {
+            "attacked_queens": attacked_queens,
+            "max_attacks": max_attacks,
+            "mean_attacks": mean_attacks,
+            "most_attacked_queen": most_attacked_queen,
+        }

@@ -89,7 +89,8 @@ def run_simulated_annealing(
     mcmc_chain,  
     schedule: 'AnnealingSchedule',  # The abstract cooling schedule object
     rng: np.random.Generator,
-    verbose_every: int = 1000
+    verbose_every: int = 1000,
+    detailed_stats : bool = False
 ) -> None:
     """
     Run the simulated annealing process using the provided MCMC chain and cooling schedule.
@@ -110,11 +111,23 @@ def run_simulated_annealing(
         # 4. Monitoring and Logging (every 1000 steps)
         if iteration % verbose_every == 0:
             current_energy = mcmc_chain.energy_model.current_energy
-            attacked = mcmc_chain.energy_model.count_attacked_queens(mcmc_chain.state)
-            print(f"Iter {iteration}, "
-                    f"T={T:.4f}, "
-                    f"Energy={mcmc_chain.energy_model.current_energy:.4f}, "
-                    f"Attacked Queens={attacked}")
+            if not detailed_stats : 
+                attacked = mcmc_chain.energy_model.count_attacked_queens(mcmc_chain.state)
+                print(f"Iter {iteration}, "
+                        f"T={T:.4f}, "
+                        f"Energy={mcmc_chain.energy_model.current_energy:.4f}, "
+                        f"Attacked Queens={attacked}")
+            else : 
+                attacked_stats = mcmc_chain.energy_model.attacked_stats(mcmc_chain.state)
+                print(
+                    f'Iter {iteration}, '
+                    f'T={T:.4f}, '
+                    f'Energy={mcmc_chain.energy_model.current_energy:.4f}, '
+                    f'Attacked Queens={attacked_stats["attacked_queens"]}, '
+                    f'mean attack={attacked_stats["mean_attacks"]:.2f}, '
+                    f'most attacked={attacked_stats["max_attacks"]:.2f}'
+                )
+
             
             # Early stopping condition if the perfect solution (E=0) is found
             if current_energy == 0:

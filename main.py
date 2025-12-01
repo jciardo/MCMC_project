@@ -29,6 +29,7 @@ def main(
     alpha: float = None,
     max_steps: int = None,
     verbose_every: int = 1000,
+    detailed_stats: bool = False
 ) -> None:
     # ? Initialize random number generator
     rng = np.random.default_rng(rng_seed)
@@ -77,7 +78,7 @@ def main(
         )
 
     # ? Run annealing
-    run_simulated_annealing(mcmc_chain, annealing_schedule, rng, verbose_every)
+    run_simulated_annealing(mcmc_chain, annealing_schedule, rng, verbose_every, detailed_stats)
 
 
 if __name__ == "__main__":
@@ -116,6 +117,12 @@ if __name__ == "__main__":
         default=1000,
         help="Print energy/diagnostics every n steps"
     )
+    parser.add_argument(
+        "--stats",
+        type=bool,
+        default=False,
+        help="Print more detailed stats for detecting pathological cases"
+    )
 
     args = parser.parse_args()
 
@@ -131,4 +138,5 @@ if __name__ == "__main__":
         alpha=args.alpha,
         max_steps=args.max_steps,
         verbose_every=args.verbose_every,
+        detailed_stats=args.stats
     )
