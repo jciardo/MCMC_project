@@ -67,6 +67,21 @@ class StackState(State):
 
         return cls(heights)
 
+    @classmethod
+    def random_latin_square(cls, N: int):
+        """
+        Implement a random state respecting constraints :
+        for one column (i, *), all heights k are different
+        """
+        rng = np.random.default_rng()
+        base = np.arange(1, N + 1)
+        heights = np.array([np.roll(base, i) for i in range(N)])
+
+        rng.shuffle(heights, axis=0)
+        rng.shuffle(heights, axis=1)
+
+        return cls(heights)
+
     def copy(self):
         """
         Deep copy
@@ -123,12 +138,15 @@ class ConstraintStackState(State):
     @classmethod
     def random(cls, N: int):
         """
-        Uniformly random state
+        Implement a random state respecting constraints :
+        for one column (i, *), all heights k are different
         """
-        # TODO : implement constraints
-
         rng = np.random.default_rng()
-        heights = rng.integers(1, N + 1, size=(N, N))
+        heights = np.zeros((N, N), dtype=int)
+        for j in range(N):
+            perm = rng.permutation(np.arange(1, N + 1))
+            for i in range(N):
+                heights[i, j] = perm[i]
 
         return cls(heights)
 
