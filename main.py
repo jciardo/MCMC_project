@@ -33,8 +33,7 @@ def main(
 
     # ? Initialize state (example: empty stacks)
     """ Ici il pourrait être intéressant d'ajouter une logique pour initialiser des états différents respectant certaines contraintes """
-    initial_heights = np.ones((N, N), dtype=int)
-    state = StackState(heights=initial_heights)
+    state = StackState.random_latin_square(N=N)
 
     # ? Initialize energy model (example: dummy geometry and line index)
     geometry = Board(N=N)  # ? Initialize Board object
