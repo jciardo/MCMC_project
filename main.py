@@ -28,13 +28,17 @@ def main(
     T_initial: float = None,
     alpha: float = None,
     max_steps: int = None,
+    verbose_every: int = 1000,
 ) -> None:
     # ? Initialize random number generator
     rng = np.random.default_rng(rng_seed)
 
     # ? Initialize state (example: empty stacks)
     """ Ici il pourrait être intéressant d'ajouter une logique pour initialiser des états différents respectant certaines contraintes """
-    state = StackState.random_latin_square(N=N)
+    #state = StackState.random_latin_square(N=N, rng=rng)
+    #state = StackState.noisy_latin_square(N=N, rng=rng)
+    state = StackState.layer_balanced_random(N=N, rng=rng)
+    #state = ConstraintStackState.random(N=N)
 
     # ? Initialize energy model (example: dummy geometry and line index)
     geometry = Board(N=N)  # ? Initialize Board object
@@ -73,7 +77,7 @@ def main(
         )
 
     # ? Run annealing
-    run_simulated_annealing(mcmc_chain, annealing_schedule, rng)
+    run_simulated_annealing(mcmc_chain, annealing_schedule, rng, verbose_every)
 
 
 if __name__ == "__main__":
@@ -106,6 +110,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max_steps", type=int, default=None, help="Max steps for geometric annealing"
     )
+    parser.add_argument(
+        "--verbose_every",
+        type=int,
+        default=1000,
+        help="Print energy/diagnostics every n steps"
+    )
 
     args = parser.parse_args()
 
@@ -120,4 +130,5 @@ if __name__ == "__main__":
         T_initial=args.T_initial,
         alpha=args.alpha,
         max_steps=args.max_steps,
+        verbose_every=args.verbose_every,
     )

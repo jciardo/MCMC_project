@@ -57,28 +57,86 @@ class StackState(State):
         self.heights = heights
 
     @classmethod
-    def random(cls, N: int):
+    def random(cls, N: int, rng = np.random.default_rng()):
         """
         Uniformly random state
         """
-
-        rng = np.random.default_rng()
         heights = rng.integers(1, N + 1, size=(N, N))
 
         return cls(heights)
 
     @classmethod
-    def random_latin_square(cls, N: int):
+    def random_latin_square(cls, N: int, rng = np.random.default_rng()):
         """
         Implement a random state respecting constraints :
         for one column (i, *), all heights k are different
         """
-        rng = np.random.default_rng()
         base = np.arange(1, N + 1)
         heights = np.array([np.roll(base, i) for i in range(N)])
 
         rng.shuffle(heights, axis=0)
         rng.shuffle(heights, axis=1)
+
+        return cls(heights)
+    
+    @classmethod
+    def noisy_latin_square(cls, N: int, p: float = 1, rng = np.random.default_rng()):
+        """
+        Noisy Latin square initialization ; 
+        i) Build Latin
+        ii) Perturb each cell (i,j) wit proba p (replace height by random {1, ..., N})
+
+        Parameters : 
+        N : board size
+        p : probability (0 : pure Latin -> 1 : random init.)
+
+        Returns : cls instance initialized w heights
+        """
+        if not (0.0 <= p <= 1.0):
+            raise ValueError("p must be in [0, 1].")
+
+        #! i) Latin square (std implementation)
+        base = np.arange(1, N + 1)
+        heights = np.array([np.roll(base, i) for i in range(N)])
+
+        rng.shuffle(heights, axis=0)
+        rng.shuffle(heights, axis=1)
+
+        #! ii) add noise
+        if p > 0.0:
+            mask = rng.random(size=(N, N)) < p
+            random_heights = rng.integers(1, N + 1, size=(N, N))
+            heights[mask] = random_heights[mask]
+
+        return cls(heights)
+    
+    @classmethod
+    def layer_balanced_random(cls, N: int, rng=np.random.default_rng()):
+        """
+        Layer-balanced random initialization : 
+        - Assign heights in {1, ..., N} to each (i,j),
+        with a bias toward using each height about N times overall
+
+        (no enforcment of row- or column-wise permutations)
+        """
+
+        heights = np.empty((N, N), dtype=int)
+
+        #! counts[h-1] = how many times height h has been used
+        counts = np.zeros(N, dtype=int)
+        target = N  #* target usage per height 
+
+        for i in range(N):
+            for j in range(N):
+                #! Favor underused heights 
+                deficits = target - counts
+                weights = np.clip(deficits, 0, None)
+                probs = weights / weights.sum()
+                idx = rng.choice(N, p=probs)
+                h = idx + 1
+
+                heights[i, j] = h
+                counts[idx] += 1
 
         return cls(heights)
 

@@ -88,7 +88,8 @@ class LinearSchedule(AnnealingSchedule):
 def run_simulated_annealing(
     mcmc_chain,  
     schedule: 'AnnealingSchedule',  # The abstract cooling schedule object
-    rng: np.random.Generator
+    rng: np.random.Generator,
+    verbose_every: int = 1000
 ) -> None:
     """
     Run the simulated annealing process using the provided MCMC chain and cooling schedule.
@@ -107,9 +108,13 @@ def run_simulated_annealing(
         schedule.step()
         
         # 4. Monitoring and Logging (every 1000 steps)
-        if iteration % 1000 == 0:
+        if iteration % verbose_every == 0:
             current_energy = mcmc_chain.energy_model.current_energy
-            print(f"Iter {iteration}: T={T:.4f}, Energy={current_energy:.4f}")
+            attacked = mcmc_chain.energy_model.count_attacked_queens(mcmc_chain.state)
+            print(f"Iter {iteration}, "
+                    f"T={T:.4f}, "
+                    f"Energy={mcmc_chain.energy_model.current_energy:.4f}, "
+                    f"Attacked Queens={attacked}")
             
             # Early stopping condition if the perfect solution (E=0) is found
             if current_energy == 0:
