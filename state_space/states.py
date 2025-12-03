@@ -1,0 +1,243 @@
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Iterable, Tuple, Optional
+import numpy as np
+
+
+Coord3D = Tuple[int, int, int]  # ? (i, j, k)
+
+
+class State(ABC):
+    """
+    Abstract interface for a 3D board configuration
+    """
+
+    def __init__(self, N: int):
+        self.N = N
+
+    @abstractmethod
+    def copy(self) -> "State":
+        """
+        Deep copy of the state
+        """
+        pass
+
+    @abstractmethod
+    def iter_queens(self) -> Iterable[Coord3D]:
+        """
+        Iterate over all queen positions (i, j, k)
+        """
+        pass
+
+    @abstractmethod
+    def as_array(self):
+        """
+        Return an array-like representation (for logging / plotting)
+        """
+        pass
+
+
+@dataclass
+class StackState(State):
+    """
+    One queen per "vertical stack" (i,j,*)
+    Internally stored as heights[i, j] = k in {1,...,N}
+    """
+
+    heights: np.ndarray  #! shape (N, N), values in [1..N]
+
+    def __init__(self, heights: np.ndarray):
+
+        N = heights.shape[0]
+        super().__init__(N)
+
+        # ? Heights as a (N x N) matrix
+        assert heights.shape == (N, N)
+        self.heights = heights
+
+    @classmethod
+    def random(cls, N: int, rng = np.random.default_rng()):
+        """
+        Uniformly random state
+        """
+        heights = rng.integers(1, N + 1, size=(N, N))
+
+        return cls(heights)
+
+    @classmethod
+    def random_latin_square(cls, N: int, rng = np.random.default_rng()):
+        """
+        Implement a random state respecting constraints :
+        for one column (i, *), all heights k are different
+        """
+        base = np.arange(1, N + 1)
+        heights = np.array([np.roll(base, i) for i in range(N)])
+
+        rng.shuffle(heights, axis=0)
+        rng.shuffle(heights, axis=1)
+
+        return cls(heights)
+    
+    @classmethod
+    def noisy_latin_square(cls, N: int, p: float = 1, rng = np.random.default_rng()):
+        """
+        Noisy Latin square initialization ; 
+        i) Build Latin
+        ii) Perturb each cell (i,j) wit proba p (replace height by random {1, ..., N})
+
+        Parameters : 
+        N : board size
+        p : probability (0 : pure Latin -> 1 : random init.)
+
+        Returns : cls instance initialized w heights
+        """
+        if not (0.0 <= p <= 1.0):
+            raise ValueError("p must be in [0, 1].")
+
+        #! i) Latin square (std implementation)
+        base = np.arange(1, N + 1)
+        heights = np.array([np.roll(base, i) for i in range(N)])
+
+        rng.shuffle(heights, axis=0)
+        rng.shuffle(heights, axis=1)
+
+        #! ii) add noise
+        if p > 0.0:
+            mask = rng.random(size=(N, N)) < p
+            random_heights = rng.integers(1, N + 1, size=(N, N))
+            heights[mask] = random_heights[mask]
+
+        return cls(heights)
+    
+    @classmethod
+    def layer_balanced_random(cls, N: int, rng=np.random.default_rng()):
+        """
+        Layer-balanced random initialization : 
+        - Assign heights in {1, ..., N} to each (i,j),
+        with a bias toward using each height about N times overall
+
+        (no enforcment of row- or column-wise permutations)
+        """
+
+        heights = np.empty((N, N), dtype=int)
+
+        #! counts[h-1] = how many times height h has been used
+        counts = np.zeros(N, dtype=int)
+        target = N  #* target usage per height 
+
+        for i in range(N):
+            for j in range(N):
+                #! Favor underused heights 
+                deficits = target - counts
+                weights = np.clip(deficits, 0, None)
+                probs = weights / weights.sum()
+                idx = rng.choice(N, p=probs)
+                h = idx + 1
+
+                heights[i, j] = h
+                counts[idx] += 1
+
+        return cls(heights)
+
+    def copy(self):
+        """
+        Deep copy
+        """
+        return StackState(self.heights.copy())
+
+    def iter_queens(self) -> Iterable[Coord3D]:
+        """
+        Provides the full set of queen coordinates [do better]
+        Interface for the energy model to counts conflicts, initialize line counts, ...
+        """
+        for i in range(self.N):
+            for j in range(self.N):
+                k = self.heights[i, j]
+                yield (i + 1, j + 1, int(k))
+
+    def as_array(self) -> np.ndarray:
+        return self.heights
+
+    #! Helpers for proposal
+
+    def get_height(self, i: int, j: int) -> int:
+        """
+        Get queen's height for stack (i,j)
+        """
+        return int(self.heights[i - 1, j - 1])
+
+    def set_height(self, i: int, j: int, k: int) -> None:
+        """
+        Set the queen's height at stack (i,j) to k
+        """
+        assert 1 <= k <= self.N
+        self.heights[i - 1, j - 1] = k
+
+
+@dataclass
+class ConstraintStackState(State):
+    """
+    One queen per "vertical stack" (i,j,*)
+    Internally stored as heights[i, j] = k in {1,...,N}
+    """
+
+    heights: np.ndarray  #! shape (N, N), values in [1..N]
+
+    def __init__(self, heights: np.ndarray):
+
+        N = heights.shape[0]
+        super().__init__(N)
+
+        # ? Heights as a (N x N) matrix
+        assert heights.shape == (N, N)
+        self.heights = heights
+
+    @classmethod
+    def random(cls, N: int):
+        """
+        Implement a random state respecting constraints :
+        for one column (i, *), all heights k are different
+        """
+        rng = np.random.default_rng()
+        heights = np.zeros((N, N), dtype=int)
+        for j in range(N):
+            perm = rng.permutation(np.arange(1, N + 1))
+            for i in range(N):
+                heights[i, j] = perm[i]
+
+        return cls(heights)
+
+    def copy(self):
+        """
+        Deep copy
+        """
+        return StackState(self.heights.copy())
+
+    def iter_queens(self) -> Iterable[Coord3D]:
+        """
+        Provides the full set of queen coordinates [do better]
+        Interface for the energy model to counts conflicts, initialize line counts, ...
+        """
+        for i in range(self.N):
+            for j in range(self.N):
+                k = self.heights[i, j]
+                yield (i + 1, j + 1, int(k))
+
+    def as_array(self) -> np.ndarray:
+        return self.heights
+
+    #! Helpers for proposal
+
+    def get_height(self, i: int, j: int) -> int:
+        """
+        Get queen's height for stack (i,j)
+        """
+        return int(self.heights[i - 1, j - 1])
+
+    def set_height(self, i: int, j: int, k: int) -> None:
+        """
+        Set the queen's height at stack (i,j) to k
+        """
+        assert 1 <= k <= self.N
+        self.heights[i - 1, j - 1] = k
