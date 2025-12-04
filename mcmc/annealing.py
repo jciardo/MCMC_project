@@ -5,6 +5,10 @@ from mcmc.chain import MCMCChain
 from mcmc.proposals import SingleStackMove, SingleConstraintStackMove
 from abc import ABC, abstractmethod
 import numpy as np
+import copy
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+
 
 
 
@@ -103,7 +107,10 @@ def run_simulated_annealing(
         T = schedule.get_temperature()
         
         # 2. Perform one MCMC step (State transition with Metropolis acceptance)
-        mcmc_chain.step(rng, T) 
+        if iteration % verbose_every == 0:
+            pr = True
+        else : pr = False
+        mcmc_chain.step(rng, T)#, pr) 
         
         # 3. Update the temperature for the next iteration
         schedule.step()
@@ -135,6 +142,29 @@ def run_simulated_annealing(
                 break
                 
         iteration += 1
+    
+    #! Visu Queens distribution per layer
+    if True :
+        stats = mcmc_chain.energy_model.attacked_stats(mcmc_chain.state)
+        layer_counts = stats["layer_counts"]
+        N = len(layer_counts)
+
+        layers = np.arange(N) 
+
+        # pour latex-like rendering (rapport)
+        mpl.rcParams['text.usetex'] = False
+        mpl.rcParams['font.family'] = 'serif'
+        mpl.rcParams['mathtext.fontset'] = 'cm'
+
+        plt.figure()
+        plt.bar(layers, layer_counts, color='firebrick')
+        plt.xlabel(r"Layer $k$")
+        plt.ylabel(r"Number of queens")
+        plt.title(r"Queen occupancy per layer")
+        plt.xticks(layers)
+        plt.tight_layout()
+        plt.show()
+
         
     print("Simulated Annealing complete.")
 
@@ -152,9 +182,17 @@ def calibrate_initial_temperature(
     energy_increases: List[float] = []
     
     # Start with a copy of the current state to avoid modifying the chain state
+    temp_chain = copy.deepcopy(mcmc_chain)
+
+    #! Fix calibration side-effects
+    current_state = temp_chain.state#mcmc_chain.state.copy()
+    energy_model = temp_chain.energy_model#mcmc_chain.energy_model
+    proposal = temp_chain.proposal#mcmc_chain.proposal
+
+    '''#! old impl
     current_state = mcmc_chain.state.copy()
     energy_model = mcmc_chain.energy_model
-    proposal = mcmc_chain.proposal
+    proposal = mcmc_chain.proposal'''
 
     # --- 1. Sampling Phase (Pure Random Walk) ---
     for _ in range(n_samples):

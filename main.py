@@ -37,8 +37,8 @@ def main(
     # ? Initialize state (example: empty stacks)
     """ Ici il pourrait être intéressant d'ajouter une logique pour initialiser des états différents respectant certaines contraintes """
     #state = StackState.random_latin_square(N=N, rng=rng)
-    #state = StackState.noisy_latin_square(N=N, rng=rng)
-    state = StackState.layer_balanced_random(N=N, rng=rng)
+    state = StackState.noisy_latin_square(N=N, p =0.2,rng=rng)
+    #state = StackState.layer_balanced_random(N=N, rng=rng)
     #state = ConstraintStackState.random(N=N)
 
     # ? Initialize energy model (example: dummy geometry and line index)
@@ -49,10 +49,15 @@ def main(
     energy_model = EnergyModel(geometry=geometry, line_index=line_index)
     energy_model.initialize(state)
 
-    # ? Initialize proposal mechanism
+    '''# ? Initialize proposal mechanism
     proposal = SingleStackRandomHeightProposal(
         N
     )  # ? Replace with actual proposal class
+    '''
+    
+    proposal = SingleStackRandomHeightProposal(
+        N
+    ) 
 
     # ? Initialize MCMC chain
     mcmc_chain = MCMCChain(state=state, energy_model=energy_model, proposal=proposal)

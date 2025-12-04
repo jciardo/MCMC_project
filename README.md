@@ -62,10 +62,9 @@ python main.py --stats True
 
 ```bash
 python main.py \
-  --N 16 \
-  --steps 800000 \
-  --seed 7 \
-  --temperatures 200,100,50 \
-  --verbose_every 2000 \
+  --N 11 \
+  --alpha 0.9999 \
+  --T_initial 100 \
+  --max_steps 100000 \
   --stats True
 ```

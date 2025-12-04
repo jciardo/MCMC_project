@@ -29,7 +29,7 @@ class MCMCChain:
         else:
             return np.exp(-delta_E / T)
 
-    def step(self, rng: np.random.Generator, T: float) -> None:
+    def step(self, rng: np.random.Generator, T: float, pr=False) -> None:
         """
         Perform a single MCMC step at temperature T
         """
@@ -39,6 +39,8 @@ class MCMCChain:
 
         #! Compute acceptance probability
         acc_prob = self.acceptance_probability(delta_E, T)
+        if pr : 
+            print('accept. proba : ',acc_prob)
 
         #! Accept or reject
         if rng.uniform(0, 1) < acc_prob:

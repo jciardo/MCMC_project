@@ -212,13 +212,21 @@ class EnergyModel:
         """
         board = self.geometry
         l_id = self.line_index
+        N = board.N
 
         attacked_queens = 0
         total_attacks = 0
         max_attacks = 0
         most_attacked_queen = None
 
+        #! queens per layer
+        layer_counts = np.zeros(N, dtype=int)
+
         for (i, j, k) in state.iter_queens():
+            
+            #? record occupancy
+            layer_counts[k-1] += 1   # adjust here if you use 1..N
+
             cell_id = board.coord_to_id(i, j, k)
             lines = l_id.cell_to_lines[cell_id]
 
@@ -243,4 +251,5 @@ class EnergyModel:
             "max_attacks": max_attacks,
             "mean_attacks": mean_attacks,
             "most_attacked_queen": most_attacked_queen,
+            "layer_counts": layer_counts, # index 0→layer1, 1→layer2,
         }
