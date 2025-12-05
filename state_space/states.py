@@ -57,7 +57,7 @@ class StackState(State):
         self.heights = heights
 
     @classmethod
-    def random(cls, N: int, rng = np.random.default_rng()):
+    def random(cls, N: int, rng=np.random.default_rng()):
         """
         Uniformly random state
         """
@@ -66,11 +66,12 @@ class StackState(State):
         return cls(heights)
 
     @classmethod
-    def random_latin_square(cls, N: int, rng = np.random.default_rng()):
+    def random_latin_square(cls, N: int, rng=np.random.default_rng()):
         """
         Implement a random state respecting constraints :
         for one column (i, *), all heights k are different
         """
+        print("Generating random Latin square for unconstrained stacks")
         base = np.arange(1, N + 1)
         heights = np.array([np.roll(base, i) for i in range(N)])
 
@@ -78,20 +79,21 @@ class StackState(State):
         rng.shuffle(heights, axis=1)
 
         return cls(heights)
-    
+
     @classmethod
-    def noisy_latin_square(cls, N: int, p: float = 1, rng = np.random.default_rng()):
+    def noisy_latin_square(cls, N: int, p: float = 1, rng=np.random.default_rng()):
         """
-        Noisy Latin square initialization ; 
+        Noisy Latin square initialization ;
         i) Build Latin
         ii) Perturb each cell (i,j) wit proba p (replace height by random {1, ..., N})
 
-        Parameters : 
+        Parameters :
         N : board size
         p : probability (0 : pure Latin -> 1 : random init.)
 
         Returns : cls instance initialized w heights
         """
+        print(f"Generating noisy Latin square with p={p:.2f} for unconstrained stacks")
         if not (0.0 <= p <= 1.0):
             raise ValueError("p must be in [0, 1].")
 
@@ -109,26 +111,27 @@ class StackState(State):
             heights[mask] = random_heights[mask]
 
         return cls(heights)
-    
+
     @classmethod
     def layer_balanced_random(cls, N: int, rng=np.random.default_rng()):
         """
-        Layer-balanced random initialization : 
+        Layer-balanced random initialization :
         - Assign heights in {1, ..., N} to each (i,j),
         with a bias toward using each height about N times overall
 
         (no enforcment of row- or column-wise permutations)
         """
+        print("Generating layer-balanced random state for unconstrained stacks")
 
         heights = np.empty((N, N), dtype=int)
 
         #! counts[h-1] = how many times height h has been used
         counts = np.zeros(N, dtype=int)
-        target = N  #* target usage per height 
+        target = N  # * target usage per height
 
         for i in range(N):
             for j in range(N):
-                #! Favor underused heights 
+                #! Favor underused heights
                 deficits = target - counts
                 weights = np.clip(deficits, 0, None)
                 probs = weights / weights.sum()
@@ -139,6 +142,30 @@ class StackState(State):
                 counts[idx] += 1
 
         return cls(heights)
+
+    @classmethod
+    def init_state(
+        cls, N: int, rng=np.random.default_rng(), mode: str = "noisy_latin_square"
+    ):
+        """
+        Initialize state based on the specified mode.
+        Parameters:
+        - N: Size of the board.
+        - rng: Random number generator.
+        - mode: Initialization mode ('noisy_latin_square', 'layer_balanced_random', 'random_latin_square', 'random').
+        Returns:
+        - An instance of StackState initialized according to the specified mode.
+        """
+        if mode == "noisy_latin_square":
+            return cls.noisy_latin_square(N=N, rng=rng)
+        elif mode == "layer_balanced_random":
+            return cls.layer_balanced_random(N=N, rng=rng)
+        elif mode == "random_latin_square":
+            return cls.random_latin_square(N=N, rng=rng)
+        elif mode == "random":
+            return cls.random(N=N, rng=rng)
+        else:
+            raise ValueError(f"Unknown initialization mode: {mode}")
 
     def copy(self):
         """
@@ -188,31 +215,48 @@ class ConstraintStackState(State):
 
         N = heights.shape[0]
         super().__init__(N)
-
-        # ? Heights as a (N x N) matrix
-        assert heights.shape == (N, N)
+        assert heights.shape == (N, N), f"Heights shape must be ({N}, {N})"
+        # Vérifie que chaque colonne est une permutation de 1..N
+        for j in range(N):
+            if set(heights[:, j]) != set(range(1, N + 1)):
+                raise ValueError(f"Column {j} is not a permutation of 1..N")
         self.heights = heights
 
     @classmethod
-    def random(cls, N: int):
+    def random_latin_square(cls, N: int, rng=np.random.default_rng()):
         """
-        Implement a random state respecting constraints :
-        for one column (i, *), all heights k are different
+        Generate a random Latin square for constrained stacks:
+        Each column is a permutation of 1..N
         """
-        rng = np.random.default_rng()
+        print("Generating random Latin square for constrained stacks")
         heights = np.zeros((N, N), dtype=int)
         for j in range(N):
-            perm = rng.permutation(np.arange(1, N + 1))
-            for i in range(N):
-                heights[i, j] = perm[i]
-
+            heights[:, j] = rng.permutation(np.arange(1, N + 1))
         return cls(heights)
+
+    @classmethod
+    def init_state(
+        cls, N: int, rng=np.random.default_rng(), mode: str = "random_latin_square"
+    ):
+        """
+        Initialize state based on the specified mode.
+        Parameters:
+        - N: Size of the board.
+        - rng: Random number generator.
+        - mode: Initialization mode ('random_latin_square').
+        Returns:
+        - An instance of ConstraintStackState initialized according to the specified mode.
+        """
+        if mode == "random_latin_square":
+            return cls.random_latin_square(N=N, rng=rng)
+        else:
+            raise ValueError(f"Unknown initialization mode: {mode}")
 
     def copy(self):
         """
         Deep copy
         """
-        return StackState(self.heights.copy())
+        return ConstraintStackState(self.heights.copy())
 
     def iter_queens(self) -> Iterable[Coord3D]:
         """
@@ -239,5 +283,5 @@ class ConstraintStackState(State):
         """
         Set the queen's height at stack (i,j) to k
         """
-        assert 1 <= k <= self.N
+        assert 1 <= k <= self.N, f"Height k={k} out of bounds"
         self.heights[i - 1, j - 1] = k

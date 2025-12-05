@@ -28,6 +28,8 @@ def main(
     N: int,
     number_of_steps: int,
     rng_seed: int,
+    state: StackState | ConstraintStackState = StackState,
+    mode_init: str = "noisy_latin_square",
     T_initial: float = None,
     alpha: float = None,
     max_steps: int = None,
@@ -40,10 +42,7 @@ def main(
 
     # ? Initialize state (example: empty stacks)
     """ Ici il pourrait être intéressant d'ajouter une logique pour initialiser des états différents respectant certaines contraintes """
-    # state = StackState.random_latin_square(N=N, rng=rng)
-    # state = StackState.noisy_latin_square(N=N, rng=rng)
-    state = StackState.layer_balanced_random(N=N, rng=rng)
-    # state = ConstraintStackState.random(N=N)
+    state = state.init_state(N=N, rng=rng, mode=mode_init)
 
     # ? Initialize energy model (example: dummy geometry and line index)
     geometry = Board(N=N)  # ? Initialize Board object
@@ -54,10 +53,11 @@ def main(
     energy_model.initialize(state)
 
     # ? Initialize proposal mechanism
-    proposal = SingleStackRandomHeightProposal(
-        N
-    )  # ? Replace with actual proposal class
-
+    proposal = (
+        SingleStackRandomHeightProposal(N)
+        if isinstance(state, StackState)
+        else SingleConstraintStackSwapProposal(N)
+    )
     # ? Initialize MCMC chain
     mcmc_chain = MCMCChain(state=state, energy_model=energy_model, proposal=proposal)
 
@@ -79,9 +79,18 @@ def main(
         )
 
     # ? Run annealing
-    history = run_simulated_annealing(
-        mcmc_chain, annealing_schedule, rng, verbose_every, detailed_stats, is_watched
-    )
+    try:
+        history = run_simulated_annealing(
+            mcmc_chain,
+            annealing_schedule,
+            rng,
+            verbose_every,
+            detailed_stats,
+            is_watched,
+        )
+    except Exception as e:
+        print(f"Simulated Annealing failed with error: {e}")
+        return {"error": str(e)}
     return history
 
 
@@ -92,7 +101,11 @@ def run_single_simulation(args_dict: dict) -> dict:
     seed = args_dict["rng_seed"]
     try:
         # We can override verbose_every here if needed to not flood the output
-        args_dict["verbose_every"] = 10000000
+        args_dict["verbose_every"] = (
+            10000000
+            if args_dict.get("is_watched", False)
+            else args_dict["verbose_every"]
+        )
         print(f"--> Start simulation Seed {seed} on process {os.getpid()}")
 
         result = main(**args_dict)
@@ -101,11 +114,12 @@ def run_single_simulation(args_dict: dict) -> dict:
             f"<-- End simulation Seed {seed}. Energie: {result['energy'][-1]:.4f}, Queen attacked : {result['attacked_queens'][-1]:.4f} on process {os.getpid()} in {len(result['energy'])} steps"
         )
         return result
-    except Exception as e:
+    except AssertionError as e:
+        print(f"!! Simulation Seed {seed} failed with error: {e}")
         return {"seed": seed, "error": str(e)}
 
 
-def plot_results(N: int, results: list) -> None:
+def plot_results(N: int, mode_init: str, state_type: str, results: list) -> None:
     """
     Plots the results from multiple Simulated Annealing runs.
     Highlights the Mean, the Best Run (global minimum final energy), and the Worst Run.
@@ -218,7 +232,7 @@ def plot_results(N: int, results: list) -> None:
     ax_queens.grid(True, linestyle="--", alpha=0.7)
 
     fig.suptitle(
-        f"Simulated Annealing Results for {N}-Stacks Problem, with {len(results)} simulations",
+        f"Simulated Annealing Results for {N}-Stacks {state_type if state_type!='stack'else ""} Problem, with {len(results)} simulations and '{mode_init}' Initialization",
         fontsize=16,
     )
 
@@ -234,6 +248,18 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--base_seed", type=int, default=42, help="Random number generator seed"
+    )
+    parser.add_argument(
+        "--state_type",
+        type=str,
+        default="stack",
+        help="Type of state: 'stack' or 'constraint'",
+    )
+    parser.add_argument(
+        "--mode_init",
+        type=str,
+        default="random_latin_square",
+        help="Initialization mode: 'noisy_latin_square' or 'layer_balanced_random' or 'random_latin_square'",
     )
     parser.add_argument(
         "--T_initial",
@@ -286,6 +312,8 @@ if __name__ == "__main__":
             "number_of_steps": args.steps,
             "rng_seed": args.base_seed + i,
             "T_initial": args.T_initial,
+            "mode_init": args.mode_init,
+            "state": StackState if args.state_type == "stack" else ConstraintStackState,
             "alpha": args.alpha,
             "max_steps": args.max_steps,
             "verbose_every": args.verbose_every,
@@ -311,4 +339,6 @@ if __name__ == "__main__":
     print(f"All simulations completed in {duration:.2f} seconds.")
 
     # ? Plot results
-    plot_results(args.N, results)
+    plot_results(
+        N=args.N, mode_init=args.mode_init, state_type=args.state_type, results=results
+    )

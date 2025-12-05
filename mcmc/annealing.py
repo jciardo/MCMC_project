@@ -157,16 +157,14 @@ def run_simulated_annealing(
                 # Early stopping condition if the perfect solution (E=0) is found
                 if current_energy == 0:
                     print(f"Solution found at iteration {iteration}!")
+                    pbar.close()
                     return history
 
             iteration += 1
             pbar.update(1)
 
-    # Close the progress bar if it was used
-    if is_watched and schedule._current_step < schedule.max_steps:
-        pbar.close()
-
     print("Simulated Annealing complete.")
+    pbar.close()
     return history
 
 
@@ -197,15 +195,16 @@ def calibrate_initial_temperature(
             energy_increases.append(delta_E)
 
         # 2. Apply the proposed move to create the next state for the random walk.
-
         energy_model.apply_move(
-            current_state,
-            *(
-                (move.i, move.j, move.k_new)
-                if isinstance(move, SingleStackMove)
-                else (move.i1, move.i2, move.j, move.k1, move.k2)
-            ),
-            delta_E,
+            state=current_state,
+            i=move.i if isinstance(move, SingleStackMove) else None,
+            j=move.j,
+            k_new=move.k_new if isinstance(move, SingleStackMove) else None,
+            i1=move.i1 if isinstance(move, SingleConstraintStackMove) else None,
+            i2=move.i2 if isinstance(move, SingleConstraintStackMove) else None,
+            k1=move.k1 if isinstance(move, SingleConstraintStackMove) else None,
+            k2=move.k2 if isinstance(move, SingleConstraintStackMove) else None,
+            delta_E=delta_E,
         )
 
         # 3. Recalculate energy_model's line_counts for the next proposal.

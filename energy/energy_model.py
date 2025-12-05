@@ -190,7 +190,7 @@ class EnergyModel:
         board = self.geometry
         l_id = self.line_index
 
-        for (i, j, k) in state.iter_queens():
+        for i, j, k in state.iter_queens():
             cell_id = board.coord_to_id(i, j, k)
             lines = l_id.cell_to_lines[cell_id]
 
@@ -199,7 +199,7 @@ class EnergyModel:
                 attacked += 1
 
         return attacked
-    
+
     def attacked_stats(self, state: StackState):
         """
         Compute more precise attack stats:
@@ -218,16 +218,16 @@ class EnergyModel:
         max_attacks = 0
         most_attacked_queen = None
 
-        for (i, j, k) in state.iter_queens():
+        for i, j, k in state.iter_queens():
             cell_id = board.coord_to_id(i, j, k)
             lines = l_id.cell_to_lines[cell_id]
 
-            #? count how many other queens attack this queen
+            # ? count how many other queens attack this queen
             attacks_here = 0
             for line_id in lines:
                 n = self.line_counts[line_id]
                 if n > 1:
-                    attacks_here += (n - 1)
+                    attacks_here += n - 1
 
             if attacks_here > 0:
                 attacked_queens += 1
@@ -236,7 +236,7 @@ class EnergyModel:
                     max_attacks = attacks_here
                     most_attacked_queen = (i, j, k)
 
-        mean_attacks = (total_attacks / attacked_queens if attacked_queens > 0 else 0.0)
+        mean_attacks = total_attacks / attacked_queens if attacked_queens > 0 else 0.0
 
         return {
             "attacked_queens": attacked_queens,

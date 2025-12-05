@@ -36,7 +36,6 @@ class MCMCChain:
 
         #! Propose a move
         move, delta_E = self.proposal.propose(self.state, self.energy_model, rng)
-
         #! Compute acceptance probability
         acc_prob = self.acceptance_probability(delta_E, T)
 
@@ -52,10 +51,10 @@ class MCMCChain:
                 # ? Swap heights in constrained stacks
                 self.energy_model.apply_move(
                     self.state,
-                    move.i1,
-                    move.i2,
-                    move.j,
-                    move.k1,
-                    move.k2,
-                    delta_E,
+                    i1=move.i1,
+                    i2=move.i2,
+                    j=move.j,
+                    k1=move.k1,
+                    k2=move.k2,
+                    delta_E=delta_E,
                 )
