@@ -2,7 +2,7 @@
 
 ## Running the Simulation
 
-The solver is called from the cli using the main script. At minimum, specify the board size `N` and the number of MCMC steps.
+The solver is called from the CLI using the main script. At minimum, specify the board size `N` and the number of MCMC steps.
 
 ### Basic Usage
 
@@ -15,24 +15,36 @@ Runs an annealing session on an 8x8x8 board with 1 million MCMC updates.
 ### Random Seed
 
 ```bash
-python main.py --N 8 --steps 200000 --seed 123
+python main.py --N 8 --steps 200000 --base_seed 123
 ```
 
 Ensures reproducible sampling.
 
-### Discrete Annealing Schedule
+### State Type
 
-Provide a comma-separated list of temperatures:
+Choose the type of state representation:
+- `stack` (default): unconstrained stacks
+- `constraint`: constrained stacks (Latin square per column)
 
 ```bash
-python main.py --N 10 --steps 500000 --temperatures 100,50,20,10,5
+python main.py --N 8 --state_type stack
+python main.py --N 8 --state_type constraint
 ```
 
-The chain cycles through these temperatures in sequence.
+### Initialization Mode
+
+Choose the initialization mode for the state:
+- `noisy_latin_square`
+- `layer_balanced_random`
+- `random_latin_square`
+
+```bash
+python main.py --N 8 --mode_init noisy_latin_square
+```
 
 ### Geometric (Exponential) Annealing
 
-Instead of discrete temperatures, specify a geometric cooling schedule:
+Specify a geometric cooling schedule:
 
 ```bash
 python main.py --N 12 --T_initial 200 --alpha 0.995 --max_steps 300000
@@ -58,6 +70,14 @@ Enable extended attack count statistics:
 python main.py --stats True
 ```
 
+### Parallel Simulations
+
+Run several simulations in parallel (default: 10):
+
+```bash
+python main.py --n_simulations 5 --max_workers 2
+```
+
 ### Full Example
 
 ```bash
@@ -66,5 +86,23 @@ python main.py \
   --alpha 0.9999 \
   --T_initial 100 \
   --max_steps 100000 \
+  --state_type constraint \
+  --mode_init random_latin_square \
+  --n_simulations 4 \
   --stats True
 ```
+
+### Arguments Summary
+
+- `--N`: Size of the board (N x N)
+- `--steps`: Number of MCMC steps
+- `--base_seed`: Random number generator seed (used for parallel runs)
+- `--state_type`: 'stack' or 'constraint'
+- `--mode_init`: Initialization mode ('noisy_latin_square', 'layer_balanced_random', 'random_latin_square')
+- `--T_initial`: Initial temperature for geometric annealing
+- `--alpha`: Cooling factor for geometric annealing
+- `--max_steps`: Max steps for geometric annealing
+- `--verbose_every`: Print diagnostics every n steps
+- `--stats`: Print more detailed stats (True/False)
+- `--n_simulations`: Number of parallel simulations
+- `--max_workers`: Max number of parallel workers
