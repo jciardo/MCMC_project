@@ -145,3 +145,14 @@ if __name__ == "__main__":
         verbose_every=args.verbose_every,
         detailed_stats=args.stats
     )
+
+"""
+Seem to work for these hyper params ;
+
+        python main.py \
+--N 11 \
+--alpha 0.9999 \
+--T_initial 100 \
+--max_steps 100000 \
+--stats True
+"""
