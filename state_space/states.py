@@ -145,7 +145,11 @@ class StackState(State):
 
     @classmethod
     def init_state(
-        cls, N: int, rng=np.random.default_rng(), mode: str = "noisy_latin_square"
+        cls,
+        N: int,
+        rng=np.random.default_rng(),
+        mode: str = "noisy_latin_square",
+        p: float = 0.2,
     ):
         """
         Initialize state based on the specified mode.
@@ -157,7 +161,7 @@ class StackState(State):
         - An instance of StackState initialized according to the specified mode.
         """
         if mode == "noisy_latin_square":
-            return cls.noisy_latin_square(N=N, rng=rng)
+            return cls.noisy_latin_square(N=N, rng=rng, p=p)
         elif mode == "layer_balanced_random":
             return cls.layer_balanced_random(N=N, rng=rng)
         elif mode == "random_latin_square":

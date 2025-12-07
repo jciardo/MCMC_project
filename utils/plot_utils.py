@@ -1,9 +1,20 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.font_manager import FontProperties
+from matplotlib.text import TextPath
 
 
-def plot_results(N: int, mode_init: str, state_type: str, results: list) -> None:
+def plot_results(
+    N: int,
+    mode_init: str,
+    state_type: str,
+    results: list,
+    noisy_p: float = None,
+    plot_cube: bool = False,
+    use_symbols: bool = True,
+) -> None:
     """
     Plots the results from multiple Simulated Annealing runs.
     Highlights the Mean, the Best Run (global minimum final energy), and the Worst Run.
@@ -115,10 +126,137 @@ def plot_results(N: int, mode_init: str, state_type: str, results: list) -> None
     ax_queens.legend(loc="upper right", fontsize=8)
     ax_queens.grid(True, linestyle="--", alpha=0.7)
 
-    fig.suptitle(
-        f"Simulated Annealing Results for {N}-Stacks {state_type if state_type!='stack'else ""} Problem, with {len(results)} simulations and '{mode_init}' Initialization",
-        fontsize=16,
+    title = (
+        f"Simulated Annealing Results for {N}-Stacks {state_type if state_type!='stack'else ""} Problem, with {len(results)} simulations and '{mode_init}' Initialization"
+        if mode_init != "noisy_latin_square"
+        else f"Simulated Annealing Results for {N}-Stacks {state_type if state_type!='stack'else ''} Problem, with {len(results)} simulations and {mode_init} Initialization (p={noisy_p})"
     )
+
+    fig.suptitle(title, fontsize=16)
 
     plt.tight_layout()
     plt.show()
+    # Optionally plot the 3D cube of the best solution
+    if plot_cube:
+        fig = plt.figure(figsize=(8, 8))
+        ax = fig.add_subplot(111, projection="3d")
+        queen_positions = results[winner_index]["positions"][-1]
+        cube_size = N
+        edges = [
+            ([0, 0, 0], [1, 0, 0]),
+            ([0, 0, 0], [0, 1, 0]),
+            ([0, 0, 0], [0, 0, 1]),
+            ([1, 1, 1], [0, 1, 1]),
+            ([1, 1, 1], [1, 0, 1]),
+            ([1, 1, 1], [1, 1, 0]),
+            ([0, 1, 0], [0, 1, 1]),
+            ([0, 1, 0], [1, 1, 0]),
+            ([1, 0, 0], [1, 0, 1]),
+            ([1, 0, 0], [1, 1, 0]),
+            ([0, 0, 1], [0, 1, 1]),
+            ([0, 0, 1], [1, 0, 1]),
+        ]
+        for s, e in edges:
+            ax.plot3D(
+                [s[0] * cube_size, e[0] * cube_size],
+                [s[1] * cube_size, e[1] * cube_size],
+                [s[2] * cube_size, e[2] * cube_size],
+                color="black",
+            )
+
+        try:
+            n_strates = int(cube_size)
+            cmap = plt.cm.get_cmap("viridis", max(1, n_strates))
+        except Exception:
+            cmap = plt.cm.get_cmap("viridis")
+
+        font_name = "DejaVu Sans"
+        fp = FontProperties(family=font_name)
+
+        def font_has_glyph(font_prop, glyph):
+            try:
+                _ = TextPath((0, 0), glyph, prop=font_prop)
+                return True
+            except Exception:
+                return False
+
+        glyph = "♛"
+        glyph_supported = font_has_glyph(fp, glyph)
+
+        use_textpath_fallback = False
+        if use_symbols and glyph_supported:
+            for x, y, z in queen_positions:
+                color = (
+                    cmap(int(z))
+                    if isinstance(cmap, plt.cm.ScalarMappable)
+                    else cmap(int(z))
+                )
+                ax.text(
+                    x,
+                    y,
+                    z,
+                    glyph,
+                    fontproperties=fp,
+                    fontsize=18,
+                    horizontalalignment="center",
+                    verticalalignment="center",
+                    color=color,
+                )
+        elif use_symbols and not glyph_supported:
+            use_textpath_fallback = True
+            tp = TextPath((0, 0), glyph, prop=FontProperties(size=40))
+            for x, y, z in queen_positions:
+                color = (
+                    cmap(int(z))
+                    if isinstance(cmap, plt.cm.ScalarMappable)
+                    else cmap(int(z))
+                )
+                ax.scatter([x], [y], [z], marker=tp, s=200, color=color)
+        else:
+            for x, y, z in queen_positions:
+                color = (
+                    cmap(int(z))
+                    if isinstance(cmap, plt.cm.ScalarMappable)
+                    else cmap(int(z))
+                )
+                ax.scatter([x], [y], [z], s=80, color=color, marker="o")
+
+        # --- Ajustements ---
+        ax.set_xlim(0, cube_size)
+        ax.set_ylim(0, cube_size)
+        ax.set_zlim(0, cube_size)
+
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
+        ax.set_title(
+            f"3D Cube Representation of Best Solution for N = {N}", fontsize=14
+        )
+
+        from matplotlib.lines import Line2D
+
+        if isinstance(cmap, plt.cm.ScalarMappable):
+            handles = []
+            labels = []
+            for z in range(min(n_strates, 10)):
+                handles.append(
+                    Line2D(
+                        [0],
+                        [0],
+                        marker="o",
+                        color="w",
+                        markerfacecolor=cmap(z),
+                        markersize=8,
+                    )
+                )
+                labels.append(f"z={z}")
+            ax.legend(
+                handles,
+                labels,
+                title="z",
+                loc="upper left",
+                bbox_to_anchor=(1.05, 1),
+            )
+
+        plt.tight_layout()
+        plt.show()

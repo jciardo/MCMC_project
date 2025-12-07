@@ -37,13 +37,17 @@ def main(
     verbose_every: int = 1000,
     detailed_stats: bool = False,
     is_watched: bool = False,
+    noisy_p: float = 0.2,
 ) -> None:
     # ? Initialize random number generator
     rng = np.random.default_rng(rng_seed)
 
     # ? Initialize state (example: empty stacks)
     """ Ici il pourrait être intéressant d'ajouter une logique pour initialiser des états différents respectant certaines contraintes """
-    state = state.init_state(N=N, rng=rng, mode=mode_init)
+    if mode_init == "noisy_latin_square":
+        state = state.init_state(N=N, rng=rng, mode=mode_init, p=noisy_p)
+    else:
+        state = state.init_state(N=N, rng=rng, mode=mode_init)
 
     # ? Initialize energy model (example: dummy geometry and line index)
     geometry = Board(N=N)  # ? Initialize Board object
@@ -64,9 +68,9 @@ def main(
     mcmc_chain_calibration = MCMCChain(
         state=state, energy_model=energy_model, proposal=proposal
     )
-    T_initial = calibrate_initial_temperature(
-        mcmc_chain_calibration, target_acceptance_rate=0.85, n_samples=5000, rng=rng
-    )
+    # T_initial = calibrate_initial_temperature(
+    #     mcmc_chain_calibration, target_acceptance_rate=0.85, n_samples=5000, rng=rng
+    # )
     print(f"Calibrated initial temperature: T0 = {T_initial:.4f}")
 
     # ? Define annealing schedule
@@ -143,6 +147,7 @@ if __name__ == "__main__":
         default="random_latin_square",
         help="Initialization mode: 'noisy_latin_square' or 'layer_balanced_random' or 'random_latin_square'",
     )
+
     parser.add_argument(
         "--T_initial",
         type=float,
@@ -176,6 +181,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max_workers", type=int, default=None, help="Max number of parallel workers"
     )
+    parser.add_argument(
+        "--noisy_p",
+        type=float,
+        default=0.2,
+        help="Probability parameter for noisy_latin_square initialization (only used if mode_init is 'noisy_latin_square')",
+    )
     args = parser.parse_args()
 
     max_workers = (
@@ -202,6 +213,9 @@ if __name__ == "__main__":
             "detailed_stats": args.stats,
             "is_watched": should_be_watched,
         }
+        # Adding noisy_p only if needed
+        if args.mode_init == "noisy_latin_square":
+            config["noisy_p"] = args.noisy_p
         simulations_configs.append(config)
 
     # ? Run simulations in parallel
@@ -222,5 +236,10 @@ if __name__ == "__main__":
 
     # ? Plot results
     plot_results(
-        N=args.N, mode_init=args.mode_init, state_type=args.state_type, results=results
+        N=args.N,
+        mode_init=args.mode_init,
+        state_type=args.state_type,
+        results=results,
+        noisy_p=args.noisy_p,
+        plot_cube=True,
     )
