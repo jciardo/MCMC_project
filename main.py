@@ -60,9 +60,9 @@ def main(
     )
     # ? Initialize MCMC chain
     mcmc_chain = MCMCChain(state=state, energy_model=energy_model, proposal=proposal)
-
+    mcmc_chain_calibration = MCMCChain(state=state, energy_model=energy_model, proposal=proposal)
     T_initial = calibrate_initial_temperature(
-        mcmc_chain, target_acceptance_rate=0.85, n_samples=5000, rng=rng
+        mcmc_chain_calibration, target_acceptance_rate=0.85, n_samples=5000, rng=rng
     )
     print(f"Calibrated initial temperature: T0 = {T_initial:.4f}")
 
