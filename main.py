@@ -5,7 +5,7 @@ import argparse
 import concurrent.futures
 import time
 import matplotlib.pyplot as plt
-from utils.plot_utils import plot_results
+from utils.plot_utils import plot_results, run_batch, plot_sa_vs_constant
 from state_space.states import StackState, ConstraintStackState
 from state_space.geometry import Board, LineIndex
 from energy.energy_model import EnergyModel
@@ -261,3 +261,60 @@ if __name__ == "__main__":
         noisy_p=args.noisy_p,
         plot_cube=False,
     )
+def experiment_sa_vs_constant(
+    N: int,
+    n_simulations: int,
+    base_seed: int,
+    max_workers: int | None,
+    T_initial: float,
+    alpha: float,
+    max_steps: int,
+    mode_init: str,
+    state_type: str,
+    noisy_p: float = 0.2,
+):
+    common_kwargs = dict(
+        number_of_steps=max_steps,
+        T_initial=T_initial,
+        alpha=alpha,
+        max_steps=max_steps,
+        mode_init=mode_init,
+        state=StackState if state_type == "stack" else ConstraintStackState,
+        verbose_every=1000000,
+        detailed_stats=False,
+        noisy_p=noisy_p,
+    )
+
+    # With simulated annealing
+    sa_results = run_batch(
+        N=N,
+        schedule_type="geometric",
+        n_simulations=n_simulations,
+        base_seed=base_seed,
+        max_workers=max_workers,
+        **common_kwargs,
+    )
+
+    # Without simulated annealing (constant T)
+    const_results = run_batch(
+        N=N,
+        schedule_type="constant",
+        n_simulations=n_simulations,
+        base_seed=base_seed + 10,  # different seeds if you like
+        max_workers=max_workers,
+        **common_kwargs,
+    )
+
+    # Now either:
+    #  - call a modified plot_results that can take two groups, or
+    #  - write a small dedicated plotting function:
+    plot_sa_vs_constant(
+    N=N,
+    sa_results=sa_results,
+    const_results=const_results,
+    mode_init=mode_init,
+    state_type=state_type,
+    noisy_p=noisy_p,
+    save_path="plots/energy_sa_vs_constant_N12.png",  
+)
+

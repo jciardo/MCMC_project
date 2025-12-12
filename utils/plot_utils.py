@@ -6,6 +6,11 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.font_manager import FontProperties
 from matplotlib.text import TextPath
 
+import concurrent.futures
+import os
+from main import run_single_simulation
+
+
 
 def plot_results(
     N: int,
@@ -286,3 +291,150 @@ def plot_results(
 
         plt.tight_layout()
         plt.show()
+
+
+def run_batch(
+    N: int,
+    schedule_type: str,
+    n_simulations: int,
+    base_seed: int,
+    max_workers: int | None,
+    **kwargs,
+    ) -> list[dict]:
+    """
+    Run n_simulations in parallel for a given schedule_type and return histories.
+    kwargs are forwarded to main().
+    """
+    if max_workers is None:
+        max_workers = os.cpu_count()
+
+    simulations_configs = []
+    for i in range(n_simulations):
+        should_be_watched = (i % max_workers == 0)
+        cfg = {
+            "N": N,
+            "rng_seed": base_seed + i,
+            "schedule_type": schedule_type,
+            **kwargs,
+            "is_watched": should_be_watched,
+        }
+                # noisy_p etc can be in kwargs
+        simulations_configs.append(cfg)
+
+    results = []
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(run_single_simulation, cfg): cfg
+            for cfg in simulations_configs
+        }
+        for future in concurrent.futures.as_completed(futures):
+            results.append(future.result())
+
+    return results
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def _aggregate_time_series(results, key="energy"):
+    """
+    Given a list of result dicts, aggregate a time series (e.g. energy)
+    across runs: returns (steps, mean, std).
+
+    We truncate all runs to the minimum common length to be safe.
+    """
+    # Keep only successful runs
+    clean = [r for r in results if isinstance(r, dict) and key in r and "error" not in r]
+    if not clean:
+        raise ValueError(f"No valid runs found with key '{key}'.")
+
+    lengths = [len(r[key]) for r in clean]
+    T = min(lengths)
+
+    data = np.stack([np.array(r[key][:T], dtype=float) for r in clean], axis=0)
+    mean = data.mean(axis=0)
+    std = data.std(axis=0)
+
+    steps = np.arange(T)
+    return steps, mean, std
+
+
+def plot_sa_vs_constant(
+    N: int,
+    sa_results: list[dict],
+    const_results: list[dict],
+    mode_init: str,
+    state_type: str,
+    noisy_p: float | None = None,
+    save_path: str | None = None,
+) -> None:
+    """
+    Compare simulated annealing vs constant-temperature MCMC for fixed N.
+
+    Parameters
+    ----------
+    N : int
+        Board size.
+    sa_results : list of dict
+        Histories from runs using a cooling schedule (e.g. GeometricSchedule).
+    const_results : list of dict
+        Histories from runs using a constant-temperature schedule.
+    mode_init : str
+        Initialization mode (for title / annotation).
+    state_type : str
+        'stack' or 'constraint' (for title / annotation).
+    noisy_p : float or None
+        Noise parameter if using noisy_latin_square (for title / annotation).
+    save_path : str or None
+        If provided, the figure is saved to this path; otherwise plt.show() is called.
+    """
+    plt.style.use("seaborn-v0_8-darkgrid")
+
+    # --- Aggregate energies
+    steps_sa, mean_sa, std_sa = _aggregate_time_series(sa_results, key="energy")
+    steps_ct, mean_ct, std_ct = _aggregate_time_series(const_results, key="energy")
+
+    # Make sure x-axes are aligned by truncating to common length
+    T = min(len(steps_sa), len(steps_ct))
+    steps = steps_sa[:T]
+    mean_sa, std_sa = mean_sa[:T], std_sa[:T]
+    mean_ct, std_ct = mean_ct[:T], std_ct[:T]
+
+    # --- Plot
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    ax.plot(steps, mean_sa, label="Simulated annealing (mean)", linewidth=2)
+    ax.fill_between(
+        steps,
+        mean_sa - std_sa,
+        mean_sa + std_sa,
+        alpha=0.25,
+        label="SA ±1 std",
+    )
+
+    ax.plot(steps, mean_ct, label="Constant T (mean)", linewidth=2, linestyle="--")
+    ax.fill_between(
+        steps,
+        mean_ct - std_ct,
+        mean_ct + std_ct,
+        alpha=0.25,
+        label="Const. T ±1 std",
+    )
+
+    ax.set_xlabel("Steps")
+    ax.set_ylabel("Energy")
+
+    subtitle = f"N={N}, init={mode_init}, state_type={state_type}"
+    if mode_init == "noisy_latin_square" and noisy_p is not None:
+        subtitle += f", p={noisy_p}"
+    ax.set_title(f"Energy vs steps with and without simulated annealing\n{subtitle}")
+
+    ax.legend(loc="upper right")
+    fig.tight_layout()
+
+    if save_path is not None:
+        fig.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+    else:
+        plt.show()
+
