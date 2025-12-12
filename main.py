@@ -5,7 +5,7 @@ import argparse
 import concurrent.futures
 import time
 import matplotlib.pyplot as plt
-from utils.plot_utils import plot_results, _aggregate_time_series, plot_sa_vs_constant
+from utils.plot_utils import plot_results, get_best_energy, plot_sa_vs_constant
 from state_space.states import StackState, ConstraintStackState
 from state_space.geometry import Board, LineIndex
 from energy.energy_model import EnergyModel
@@ -294,19 +294,19 @@ if __name__ == "__main__":
         help="Probability parameter for noisy_latin_square initialization (only used if mode_init is 'noisy_latin_square')",
     )
     parser.add_argument(
-    "--schedule_type",
-    type=str,
-    default="geometric",
-    choices=["geometric", "constant"],
-    help="Use 'geometric' for simulated annealing or 'constant' for fixed-T baseline.",
+        "--schedule_type",
+        type=str,
+        default="geometric",
+        choices=["geometric", "constant"],
+        help="Use 'geometric' for simulated annealing or 'constant' for fixed-T baseline.",
     )
 
     parser.add_argument(
-    "--experiment",
-    type=str,
-    default="single",
-    choices=["single", "sa_vs_constant"],
-    help="Run a single annealing run (default) or the SA vs Constant-T experiment.",
+        "--experiment",
+        type=str,
+        default="single",
+        choices=["single", "sa_vs_constant"],
+        help="Run a single annealing run (default) or the SA vs Constant-T experiment.",
     )
 
     args = parser.parse_args()
@@ -406,15 +406,22 @@ if __name__ == "__main__":
         duration = time.time() - start_time
         print(f"All simulations completed in {duration:.2f} seconds.")
 
+        #! Single best energy
+        best_final_energy = get_best_energy(results, use_final=True)
+        best_trajectory_energy = get_best_energy(results, use_final=False)
+
+        print(f"Best final energy across runs: {best_final_energy:.4f}")
+        print(f"Best energy reached along any trajectory: {best_trajectory_energy:.4f}")
+
         # Plot using your normal function
-        plot_results(
+        '''plot_results(
             N=args.N,
             mode_init=args.mode_init,
             state_type=args.state_type,
             results=results,
             noisy_p=args.noisy_p,
             plot_cube=False,
-        )
+        )'''
 
     # ------------------------------------------------------------
     # CASE 2: SA VS CONSTANT-T EXPERIMENT

@@ -5,6 +5,8 @@ import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.font_manager import FontProperties
 from matplotlib.text import TextPath
+from typing import Dict, List
+
 
 import concurrent.futures
 import os
@@ -133,10 +135,16 @@ def plot_results(
     ax_queens.legend(loc="upper right", fontsize=8)
     ax_queens.grid(True, linestyle="--", alpha=0.7)
 
+    state_label = state_type if state_type != "stack" else ""
+
+    if mode_init != "noisy_latin_square":
+        init_label = f"'{mode_init}' Initialization"
+    else:
+        init_label = f"{mode_init} Initialization (p={noisy_p})"
+
     title = (
-        f"Simulated Annealing Results for {N}-Stacks {state_type if state_type!='stack'else ""} Problem, with {len(results)} simulations and '{mode_init}' Initialization"
-        if mode_init != "noisy_latin_square"
-        else f"Simulated Annealing Results for {N}-Stacks {state_type if state_type!='stack'else ''} Problem, with {len(results)} simulations and {mode_init} Initialization (p={noisy_p})"
+        f"Simulated Annealing Results for {N}-Stacks {state_label} "
+        f"Problem, with {len(results)} simulations and {init_label}"
     )
 
     fig.suptitle(title, fontsize=16)
@@ -155,12 +163,12 @@ def plot_results(
         ax.plot(loser_energy, color="purple", linestyle="--", linewidth=0.8, label="Worst Run", alpha=0.35)
 
         if has_aggregate:
-            ax.plot(mean_energy, color="red", linewidth=2, label="Mean Energy")
+            ax.plot(mean_energy, color="firebrick", linewidth=2, label="Mean Energy")
 
         #?ax.set_title("Energy Evolution Across Simulations") #? Not for the report
         ax.set_xlabel("Steps")
         ax.set_ylabel("Energy")
-        ax.grid(True, linestyle="--", alpha=0.7)
+        #ax.grid(True, linestyle="--", alpha=0.7)
         ax.legend()
 
         fig_energy.tight_layout()
@@ -395,4 +403,85 @@ def plot_sa_vs_constant(
         plt.close(fig)
     else:
         plt.show()
+
+
+def plot_min_energy_vs_N(
+    min_energy_by_N: dict[int, float],
+    save_path: str | None = None,
+) -> None:
+    """
+    Plot the minimal energy reached as a function of N.
+    Assumes `min_energy_by_N` maps N -> minimal_energy_for_that_N.
+
+    Example:
+        min_energy_by_N = {8: 120, 10: 260, 12: 410}
+
+    Parameters
+    ----------
+    min_energy_by_N : dict[int, float]
+        Dictionary mapping board size N to minimal energy.
+    save_path : str or None
+        If provided, saves the figure; otherwise displays it.
+    """
+
+    plt.style.use("default")
+
+    # Sort by N
+    Ns = np.array(sorted(min_energy_by_N.keys()))
+    mins = np.array([min_energy_by_N[N] for N in Ns], dtype=float)
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+
+    #ax.plot(Ns, mins, marker="4", linewidth=1,linestyle ='dotted', color='firebrick', alpha = 0.2)
+    ax.plot(
+    Ns, mins,
+    linewidth=1,
+    linestyle='dotted',
+    color='firebrick',
+    alpha=0.2,
+    )
+    ax.plot(
+    Ns, mins,
+    marker="H",
+    linestyle='none',
+    color='firebrick',
+    alpha=1.0,
+    )
+    ax.set_xlabel("Cube $N^3$")
+    ax.set_ylabel("Minimal energy reached")
+    #ax.set_title("Minimal energy vs board size N")
+    #ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.4)
+
+    fig.tight_layout()
+
+    if save_path is not None:
+        fig.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+    else:
+        plt.show()
+
+def get_best_energy(results: list[dict], use_final: bool = True) -> float:
+    """
+    Return the best (lowest) energy from a list of run histories.
+
+    If use_final is True:
+        use E_final = energy[-1] for each run.
+    Otherwise:
+        use the best energy along the trajectory: min_t energy[t] for each run.
+    """
+    best = None
+
+    for r in results:
+        if not isinstance(r, dict) or "energy" not in r or "error" in r:
+            continue
+
+        energies = np.asarray(r["energy"], dtype=float)
+        value = energies[-1] if use_final else energies.min()
+
+        if best is None or value < best:
+            best = value
+
+    if best is None:
+        raise ValueError("No valid runs found in results.")
+    return best
 

@@ -91,7 +91,7 @@ python main.py \
   --mode_init noisy_latin_square \
   --noisy_p 0.2 \
   --n_simulations 4 \
-  --stats True \ 
+  --stats True \
 ```
 
 ### Call for Comparison of Simulated Annealing
