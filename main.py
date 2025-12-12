@@ -20,6 +20,7 @@ from mcmc.annealing import (
     LinearSchedule,
     run_simulated_annealing,
     GeometricSchedule,
+    ConstantSchedule,
     calibrate_initial_temperature,
 )
 from mcmc.proposals import SingleConstraintStackSwapProposal
@@ -38,6 +39,7 @@ def main(
     detailed_stats: bool = False,
     is_watched: bool = False,
     noisy_p: float = 0.2,
+    schedule_type: str = "geometric",
 ) -> None:
     # ? Initialize random number generator
     rng = np.random.default_rng(rng_seed)
@@ -73,16 +75,23 @@ def main(
     # )
     print(f"Calibrated initial temperature: T0 = {T_initial:.4f}")
 
-    # ? Define annealing schedule
-    if T_initial is not None and alpha is not None and max_steps is not None:
+    if T_initial is None or max_steps is None:
+        print("You must provide T_initial and max_steps")
+        return
+
+    if schedule_type == "geometric":
+        if alpha is None:
+            print("You must provide alpha for geometric annealing!")
+            return
         annealing_schedule = GeometricSchedule(
             T_initial=T_initial,
             alpha=alpha,
             max_steps=max_steps,
         )
-    else:
-        print(
-            "You must provide T_initial, alpha, and max_steps for geometric annealing !"
+    elif schedule_type == "constant":
+        annealing_schedule = ConstantSchedule(
+            T=T_initial,
+            max_steps=max_steps,
         )
 
     # ? Run annealing
@@ -187,6 +196,14 @@ if __name__ == "__main__":
         default=0.2,
         help="Probability parameter for noisy_latin_square initialization (only used if mode_init is 'noisy_latin_square')",
     )
+    parser.add_argument(
+    "--schedule_type",
+    type=str,
+    default="geometric",
+    choices=["geometric", "constant"],
+    help="Use 'geometric' for simulated annealing or 'constant' for fixed-T baseline.",
+    )
+
     args = parser.parse_args()
 
     max_workers = (
@@ -212,6 +229,7 @@ if __name__ == "__main__":
             "verbose_every": args.verbose_every,
             "detailed_stats": args.stats,
             "is_watched": should_be_watched,
+            "schedule_type": args.schedule_type,
         }
         # Adding noisy_p only if needed
         if args.mode_init == "noisy_latin_square":
@@ -241,5 +259,5 @@ if __name__ == "__main__":
         state_type=args.state_type,
         results=results,
         noisy_p=args.noisy_p,
-        plot_cube=True,
+        plot_cube=False,
     )

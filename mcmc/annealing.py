@@ -28,6 +28,20 @@ class AnnealingSchedule(ABC):
         """Indique si le processus de recuit doit s'arrêter."""
         pass
 
+class ConstantSchedule(AnnealingSchedule):
+    def __init__(self, T: float, max_steps: int):
+        self.T = T
+        self.max_steps = max_steps
+        self.step_count = 0
+
+    def get_temperature(self) -> float:
+        return self.T
+
+    def step(self) -> None:
+        self.step_count += 1
+
+    def is_finished(self) -> bool:
+        return self.step_count >= self.max_steps
 
 @dataclass
 class GeometricSchedule(AnnealingSchedule):

@@ -78,18 +78,20 @@ Run several simulations in parallel (default: 10):
 python main.py --n_simulations 5 --max_workers 2
 ```
 
-### Full Example
+### Optimal call for N = 11
 
 ```bash
 python main.py \
   --N 11 \
+  --base_seed 49 \
   --alpha 0.9999 \
   --T_initial 100 \
   --max_steps 100000 \
-  --state_type constraint \
-  --mode_init random_latin_square \
+  --state_type stack \
+  --mode_init noisy_latin_square \
+  --noisy_p 0.2 \
   --n_simulations 4 \
-  --stats True
+  --stats True \ 
 ```
 
 ### Arguments Summary
