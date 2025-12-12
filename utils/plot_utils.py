@@ -8,8 +8,6 @@ from matplotlib.text import TextPath
 
 import concurrent.futures
 import os
-from main import run_single_simulation
-
 
 
 def plot_results(
@@ -32,7 +30,9 @@ def plot_results(
     """
 
     # 1. Set Plot Style
-    plt.style.use("seaborn-v0_8-darkgrid")
+    #plt.style.use("seaborn-v0_8-darkgrid")
+    plt.style.use("default")
+
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
     # --- Aggregate Calculation and Winner Identification ---
@@ -293,48 +293,6 @@ def plot_results(
         plt.show()
 
 
-def run_batch(
-    N: int,
-    schedule_type: str,
-    n_simulations: int,
-    base_seed: int,
-    max_workers: int | None,
-    **kwargs,
-    ) -> list[dict]:
-    """
-    Run n_simulations in parallel for a given schedule_type and return histories.
-    kwargs are forwarded to main().
-    """
-    if max_workers is None:
-        max_workers = os.cpu_count()
-
-    simulations_configs = []
-    for i in range(n_simulations):
-        should_be_watched = (i % max_workers == 0)
-        cfg = {
-            "N": N,
-            "rng_seed": base_seed + i,
-            "schedule_type": schedule_type,
-            **kwargs,
-            "is_watched": should_be_watched,
-        }
-                # noisy_p etc can be in kwargs
-        simulations_configs.append(cfg)
-
-    results = []
-    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(run_single_simulation, cfg): cfg
-            for cfg in simulations_configs
-        }
-        for future in concurrent.futures.as_completed(futures):
-            results.append(future.result())
-
-    return results
-
-import numpy as np
-import matplotlib.pyplot as plt
-
 
 def _aggregate_time_series(results, key="energy"):
     """
@@ -388,7 +346,9 @@ def plot_sa_vs_constant(
     save_path : str or None
         If provided, the figure is saved to this path; otherwise plt.show() is called.
     """
-    plt.style.use("seaborn-v0_8-darkgrid")
+    #plt.style.use("seaborn-v0_8-darkgrid")
+    plt.style.use("default")
+
 
     # --- Aggregate energies
     steps_sa, mean_sa, std_sa = _aggregate_time_series(sa_results, key="energy")
@@ -403,23 +363,21 @@ def plot_sa_vs_constant(
     # --- Plot
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    ax.plot(steps, mean_sa, label="Simulated annealing (mean)", linewidth=2)
+    ax.plot(steps, mean_sa, label="Simulated annealing (mean)", linewidth=2, color='mediumblue')
     ax.fill_between(
         steps,
         mean_sa - std_sa,
         mean_sa + std_sa,
-        alpha=0.25,
-        label="SA ±1 std",
-    )
+        alpha=0.25,    
+    )#!label="SA ±1 std",
 
-    ax.plot(steps, mean_ct, label="Constant T (mean)", linewidth=2, linestyle="--")
+    ax.plot(steps, mean_ct, label="Constant T (mean)", linewidth=2, linestyle="--", color='firebrick')
     ax.fill_between(
         steps,
         mean_ct - std_ct,
         mean_ct + std_ct,
         alpha=0.25,
-        label="Const. T ±1 std",
-    )
+    ) #!label="Const. T ±1 std",
 
     ax.set_xlabel("Steps")
     ax.set_ylabel("Energy")
@@ -427,9 +385,9 @@ def plot_sa_vs_constant(
     subtitle = f"N={N}, init={mode_init}, state_type={state_type}"
     if mode_init == "noisy_latin_square" and noisy_p is not None:
         subtitle += f", p={noisy_p}"
-    ax.set_title(f"Energy vs steps with and without simulated annealing\n{subtitle}")
+    #ax.set_title(f"Energy vs steps with and without simulated annealing\n{subtitle}")
 
-    ax.legend(loc="upper right")
+    ax.legend(loc="lower center")
     fig.tight_layout()
 
     if save_path is not None:

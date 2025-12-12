@@ -5,7 +5,7 @@ import argparse
 import concurrent.futures
 import time
 import matplotlib.pyplot as plt
-from utils.plot_utils import plot_results, run_batch, plot_sa_vs_constant
+from utils.plot_utils import plot_results, _aggregate_time_series, plot_sa_vs_constant
 from state_space.states import StackState, ConstraintStackState
 from state_space.geometry import Board, LineIndex
 from energy.energy_model import EnergyModel
@@ -133,6 +133,103 @@ def run_single_simulation(args_dict: dict) -> dict:
     except AssertionError as e:
         print(f"!! Simulation Seed {seed} failed with error: {e}")
         return {"seed": seed, "error": str(e)}
+    
+
+def experiment_sa_vs_constant(
+    N: int,
+    n_simulations: int,
+    base_seed: int,
+    max_workers: int | None,
+    T_initial: float,
+    alpha: float,
+    max_steps: int,
+    mode_init: str,
+    state_type: str,
+    noisy_p: float = 0.2,
+):
+    common_kwargs = dict(
+        number_of_steps=max_steps,
+        T_initial=T_initial,
+        alpha=alpha,
+        max_steps=max_steps,
+        mode_init=mode_init,
+        state=StackState if state_type == "stack" else ConstraintStackState,
+        verbose_every=1000000,
+        detailed_stats=False,
+        noisy_p=noisy_p,
+    )
+
+    # With simulated annealing
+    sa_results = run_batch(
+        N=N,
+        schedule_type="geometric",
+        n_simulations=n_simulations,
+        base_seed=base_seed,
+        max_workers=max_workers,
+        **common_kwargs,
+    )
+
+    # Without simulated annealing (constant T)
+    const_results = run_batch(
+        N=N,
+        schedule_type="constant",
+        n_simulations=n_simulations,
+        base_seed=base_seed + 10,  # different seeds if you like
+        max_workers=max_workers,
+        **common_kwargs,
+    )
+
+    # Now either:
+    #  - call a modified plot_results that can take two groups, or
+    #  - write a small dedicated plotting function:
+    plot_sa_vs_constant(
+    N=N,
+    sa_results=sa_results,
+    const_results=const_results,
+    mode_init=mode_init,
+    state_type=state_type,
+    noisy_p=noisy_p,
+    save_path="plots/energy_sa_vs_constant_N12.png",  
+    )
+
+def run_batch(
+    N: int,
+    schedule_type: str,
+    n_simulations: int,
+    base_seed: int,
+    max_workers: int | None,
+    **kwargs,
+    ) -> list[dict]:
+    """
+    Run n_simulations in parallel for a given schedule_type and return histories.
+    kwargs are forwarded to main().
+    """
+    if max_workers is None:
+        max_workers = os.cpu_count()
+
+    simulations_configs = []
+    for i in range(n_simulations):
+        should_be_watched = (i % max_workers == 0)
+        cfg = {
+            "N": N,
+            "rng_seed": base_seed + i,
+            "schedule_type": schedule_type,
+            **kwargs,
+            "is_watched": should_be_watched,
+        }
+                # noisy_p etc can be in kwargs
+        simulations_configs.append(cfg)
+
+    results = []
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(run_single_simulation, cfg): cfg
+            for cfg in simulations_configs
+        }
+        for future in concurrent.futures.as_completed(futures):
+            results.append(future.result())
+
+    return results
 
 
 if __name__ == "__main__":
@@ -204,9 +301,17 @@ if __name__ == "__main__":
     help="Use 'geometric' for simulated annealing or 'constant' for fixed-T baseline.",
     )
 
+    parser.add_argument(
+    "--experiment",
+    type=str,
+    default="single",
+    choices=["single", "sa_vs_constant"],
+    help="Run a single annealing run (default) or the SA vs Constant-T experiment.",
+    )
+
     args = parser.parse_args()
 
-    max_workers = (
+    '''max_workers = (
         args.max_workers if args.max_workers else os.cpu_count()
     )  # ? Use all available CPUs if not specified
 
@@ -260,61 +365,106 @@ if __name__ == "__main__":
         results=results,
         noisy_p=args.noisy_p,
         plot_cube=False,
-    )
-def experiment_sa_vs_constant(
-    N: int,
-    n_simulations: int,
-    base_seed: int,
-    max_workers: int | None,
-    T_initial: float,
-    alpha: float,
-    max_steps: int,
-    mode_init: str,
-    state_type: str,
-    noisy_p: float = 0.2,
-):
-    common_kwargs = dict(
-        number_of_steps=max_steps,
-        T_initial=T_initial,
-        alpha=alpha,
-        max_steps=max_steps,
-        mode_init=mode_init,
-        state=StackState if state_type == "stack" else ConstraintStackState,
-        verbose_every=1000000,
-        detailed_stats=False,
-        noisy_p=noisy_p,
-    )
+    )'''
 
-    # With simulated annealing
-    sa_results = run_batch(
-        N=N,
-        schedule_type="geometric",
-        n_simulations=n_simulations,
-        base_seed=base_seed,
-        max_workers=max_workers,
-        **common_kwargs,
-    )
+    max_workers = args.max_workers if args.max_workers else os.cpu_count()
 
-    # Without simulated annealing (constant T)
-    const_results = run_batch(
-        N=N,
-        schedule_type="constant",
-        n_simulations=n_simulations,
-        base_seed=base_seed + 10,  # different seeds if you like
-        max_workers=max_workers,
-        **common_kwargs,
-    )
+    # ------------------------------------------------------------
+    # CASE 1: STANDARD OPERATION (your current workflow)
+    # ------------------------------------------------------------
+    if args.experiment == "single":
+        # Build configs for *one* schedule type (whatever user provided)
+        simulations_configs = []
 
-    # Now either:
-    #  - call a modified plot_results that can take two groups, or
-    #  - write a small dedicated plotting function:
-    plot_sa_vs_constant(
-    N=N,
-    sa_results=sa_results,
-    const_results=const_results,
-    mode_init=mode_init,
-    state_type=state_type,
-    noisy_p=noisy_p,
-    save_path="plots/energy_sa_vs_constant_N12.png",  
-)
+        for i in range(args.n_simulations):
+            should_be_watched = (i % max_workers == 0)
+            config = {
+                "N": args.N,
+                "number_of_steps": args.steps,
+                "rng_seed": args.base_seed + i,
+                "T_initial": args.T_initial,
+                "mode_init": args.mode_init,
+                "state": StackState if args.state_type == "stack" else ConstraintStackState,
+                "alpha": args.alpha,
+                "max_steps": args.max_steps,
+                "verbose_every": args.verbose_every,
+                "detailed_stats": args.stats,
+                "is_watched": should_be_watched,
+                "schedule_type": "geometric",   # or use a CLI arg if desired
+            }
+            if args.mode_init == "noisy_latin_square":
+                config["noisy_p"] = args.noisy_p
+            simulations_configs.append(config)
+
+        # Parallel execution
+        results = []
+        start_time = time.time()
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(run_single_simulation, cfg): cfg for cfg in simulations_configs}
+            for future in concurrent.futures.as_completed(futures):
+                results.append(future.result())
+        duration = time.time() - start_time
+        print(f"All simulations completed in {duration:.2f} seconds.")
+
+        # Plot using your normal function
+        plot_results(
+            N=args.N,
+            mode_init=args.mode_init,
+            state_type=args.state_type,
+            results=results,
+            noisy_p=args.noisy_p,
+            plot_cube=False,
+        )
+
+    # ------------------------------------------------------------
+    # CASE 2: SA VS CONSTANT-T EXPERIMENT
+    # ------------------------------------------------------------
+    elif args.experiment == "sa_vs_constant":
+
+        print("\n=== Running SA vs Constant-T experiment ===\n")
+
+        # Common kwargs forwarded to "run_batch"
+        common_kwargs = dict(
+            number_of_steps=args.max_steps,        # or args.steps
+            T_initial=args.T_initial,
+            alpha=args.alpha,
+            max_steps=args.max_steps,
+            mode_init=args.mode_init,
+            state=StackState if args.state_type == "stack" else ConstraintStackState,
+            verbose_every=args.verbose_every,
+            detailed_stats=args.stats,
+            noisy_p=args.noisy_p,
+        )
+
+        # Run SA batch
+        sa_results = run_batch(
+            N=args.N,
+            schedule_type="geometric",
+            n_simulations=args.n_simulations,
+            base_seed=args.base_seed,
+            max_workers=max_workers,
+            **common_kwargs,
+        )
+
+        # Run Constant-T batch
+        const_results = run_batch(
+            N=args.N,
+            schedule_type="constant",
+            n_simulations=args.n_simulations,
+            base_seed=args.base_seed + 10000,
+            max_workers=max_workers,
+            **common_kwargs,
+        )
+
+        # Produce comparison plot
+        plot_sa_vs_constant(
+            N=args.N,
+            sa_results=sa_results,
+            const_results=const_results,
+            mode_init=args.mode_init,
+            state_type=args.state_type,
+            noisy_p=args.noisy_p,
+            save_path=f"plots/sa_vs_const_N{args.N}.png",
+        )
+
 

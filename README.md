@@ -94,6 +94,18 @@ python main.py \
   --stats True \ 
 ```
 
+### Call for Comparison of Simulated Annealing
+
+```bash
+python main.py \
+    --experiment sa_vs_constant \
+    --N 12 \
+    --T_initial 100 \
+    --alpha 0.9999 \
+    --max_steps 100000 \
+    --n_simulations 40
+```
+
 ### Arguments Summary
 
 - `--N`: Size of the board (N x N)
