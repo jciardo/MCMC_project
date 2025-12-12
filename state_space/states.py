@@ -81,7 +81,7 @@ class StackState(State):
         return cls(heights)
 
     @classmethod
-    def noisy_latin_square(cls, N: int, p: float = 1, rng=np.random.default_rng()):
+    def noisy_latin_square(cls, N: int, p: float = 0.2, rng=np.random.default_rng()):
         """
         Noisy Latin square initialization ;
         i) Build Latin
