@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional
 from mcmc.chain import MCMCChain
-from mcmc.proposals import SingleStackMove, SingleConstraintStackMove
+from mcmc.proposals import SingleStackMove, SingleConstraintStackMove, BlockShuffleMove
 from abc import ABC, abstractmethod
 import numpy as np
 from tqdm import tqdm
@@ -82,6 +82,74 @@ class LinearSchedule(AnnealingSchedule):
 
     def is_finished(self) -> bool:
         return self._current_T <= self.min_temp
+    
+
+
+@dataclass
+class AdaptiveSchedule(AnnealingSchedule):
+    T_initial: float
+    alpha: float
+    min_temp: float = 0.001
+    max_steps: int = 1000000
+    
+    # Paramètres
+    stagnation_limit: int = 8000   
+    reheat_ratio: float = 0.3      
+    
+    # Internal State
+    _current_T: float = field(init=False)
+    _stagnation_counter: int = field(init=False, default=0)
+    _improving_streak: bool = field(init=False, default=False)
+    _max_steps: int = field(init=False)
+    _current_step: int = field(init=False, default=0)
+    
+    # --- AJOUT CRUCIAL ---
+    _local_best_energy: float = field(init=False, default=float('inf'))
+
+    def __post_init__(self):
+        self._current_T = self.T_initial
+        self._max_steps = self.max_steps
+        self._current_step = 0
+        self._local_best_energy = float('inf')
+
+    def get_temperature(self) -> float:
+        return self._current_T
+
+    def update_metrics(self, current_energy: float, global_best_energy: float) -> None:
+        # On compare par rapport au LOCAL best (depuis le dernier reheat)
+        # pour savoir si on est en train de descendre ou si on est bloqué.
+        if current_energy < self._local_best_energy:
+            self._local_best_energy = current_energy
+            self._stagnation_counter = 0
+            self._improving_streak = True
+        else:
+            self._improving_streak = False
+            self._stagnation_counter += 1
+
+    def step(self) -> None:
+        self._current_step += 1
+        
+        # Cruising
+        if self._improving_streak:
+            return 
+
+        # Reheating
+        if self._stagnation_counter > self.stagnation_limit:
+            # Reset Temperature
+            self._current_T = self.T_initial * self.reheat_ratio
+            
+            # --- RESET VITAL ---
+            # On oublie le record précédent, on veut juste voir si on s'améliore DANS LE FUTUR
+            self._stagnation_counter = 0
+            self._local_best_energy = float('inf') 
+            return
+
+        # Normal Cooling
+        if self._current_T > self.min_temp:
+            self._current_T *= self.alpha
+
+    def is_finished(self) -> bool:
+        return self._current_step >= self._max_steps
 
 
 def run_simulated_annealing(
@@ -91,6 +159,7 @@ def run_simulated_annealing(
     verbose_every: int = 1000,
     detailed_stats: bool = False,
     is_watched: bool = False,
+    re_heat: bool = False,
 ) -> dict:
     """
     Run the simulated annealing process using the provided MCMC chain and cooling schedule.
@@ -104,6 +173,7 @@ def run_simulated_annealing(
         "attacked_queens": [],
         "positions": [],
     }
+    best_energy = mcmc_chain.energy_model.current_energy
 
     if is_watched:
         pbar_context = tqdm(total=schedule.max_steps, desc="Simulated Annealing")
@@ -120,10 +190,16 @@ def run_simulated_annealing(
             mcmc_chain.step(rng, T)
 
             # 3. Update the temperature for the next iteration
+            if(re_heat == True):
+                schedule.update_metrics(mcmc_chain.energy_model.current_energy, 
+                                        best_energy)
             schedule.step()
 
             # Collect stats at every step
             current_energy = mcmc_chain.energy_model.current_energy
+            if(current_energy < best_energy): 
+                best_energy = current_energy
+
             attacked = mcmc_chain.energy_model.count_attacked_queens(mcmc_chain.state)
             positions = list(mcmc_chain.state.iter_queens())
 
@@ -171,15 +247,15 @@ def run_simulated_annealing(
 def calibrate_initial_temperature(
     mcmc_chain: "MCMCChain",
     target_acceptance_rate: float = 0.8,
-    n_samples: int = 1000,
+    n_samples: int = 5000,
     rng: np.random.Generator = np.random.default_rng(),
 ) -> float:
     """
     Calibrates the initial temperature T0 for Simulated Annealing (SA).
     """
-    energy_increases: List[float] = []
+    energy_increases: list[float] = []
 
-    # Start with a copy of the current state to avoid modifying the chain state
+    # Start with a copy of the current state
     current_state = mcmc_chain.state.copy()
     energy_model = mcmc_chain.energy_model
     proposal = mcmc_chain.proposal
@@ -187,68 +263,56 @@ def calibrate_initial_temperature(
     # --- 1. Sampling Phase (Pure Random Walk) ---
     for _ in range(n_samples):
 
-        # 1a. Propose a move and get the energy difference (Delta E)
+        # 1a. Propose a move
         move, delta_E = proposal.propose(current_state, energy_model, rng)
 
-        # 1b. Store only moves that cause energy degradation (Delta E > 0)
+        # 1b. Store degradation
         if delta_E > 0:
             energy_increases.append(delta_E)
 
-        # 2. Apply the proposed move to create the next state for the random walk.
-        energy_model.apply_move(
-            state=current_state,
-            i=move.i if isinstance(move, SingleStackMove) else None,
-            j=move.j,
-            k_new=move.k_new if isinstance(move, SingleStackMove) else None,
-            i1=move.i1 if isinstance(move, SingleConstraintStackMove) else None,
-            i2=move.i2 if isinstance(move, SingleConstraintStackMove) else None,
-            k1=move.k1 if isinstance(move, SingleConstraintStackMove) else None,
-            k2=move.k2 if isinstance(move, SingleConstraintStackMove) else None,
-            delta_E=delta_E,
-        )
+        # 2. Apply the proposed move (Must handle ALL move types)
+        # --- CORRECTION ICI : Gestion dynamique des types de mouvements ---
+        
+        if isinstance(move, SingleStackMove):
+            energy_model.apply_move(
+                state=current_state,
+                i=move.i,
+                j=move.j,
+                k_new=move.k_new,
+                delta_E=delta_E,
+            )
+            
+        elif isinstance(move, SingleConstraintStackMove):
+            energy_model.apply_move(
+                state=current_state,
+                i1=move.i1,
+                i2=move.i2,
+                j=move.j,
+                k1=move.k1,
+                k2=move.k2,
+                delta_E=delta_E,
+            )
+            
+        elif isinstance(move, BlockShuffleMove):
+            # Application manuelle pour le Shuffle
+            for (i, j), k_new in zip(move.indices, move.new_heights):
+                if hasattr(current_state, 'stacks'):
+                    current_state.stacks[i-1][j-1] = k_new
+                elif hasattr(current_state, 'set_height'):
+                    current_state.set_height(i, j, k_new)
+            # Re-sync energy model
+            energy_model.initialize(current_state)
 
-        # 3. Recalculate energy_model's line_counts for the next proposal.
-        energy_model.initialize(
-            current_state
-        )  # Re-initialize the model with the new state
+        # Note: On n'a plus besoin de re-initialize systématique ici sauf pour le Shuffle 
+        # car apply_move le fait pour les autres.
 
     # --- 2. T0 Calculation ---
-    if not energy_increases:  # Check if the list is empty
-        print(
-            "Warning: No energy-increasing moves found during sampling. Defaulting T0 to 10.0."
-        )
+    if not energy_increases:
+        print("Warning: No energy-increasing moves found. Defaulting T0 to 10.0.")
         return 10.0
 
     mean_energy_increase = np.mean(energy_increases)
-
-    # 4. Calculate T0 using the inverse Metropolis formula
     T0 = -mean_energy_increase / np.log(target_acceptance_rate)
 
     print(f"Average energy degradation (mean Delta E > 0): {mean_energy_increase:.2f}")
-    print(
-        f"Initial temperature T0 calculated for {target_acceptance_rate*100}% acceptance: {T0:.2f}"
-    )
-
     return T0
-
-
-class DummyPbar:
-    """A dummy progress bar that does nothing."""
-
-    def __init__(self, total=None, desc=None):
-        pass
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
-
-    def update(self, n=1):
-        pass
-
-    def set_postfix(self, ordered_dict=None, refresh=True):
-        pass
-
-    def close(self):
-        pass

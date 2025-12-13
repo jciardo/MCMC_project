@@ -13,11 +13,14 @@ from mcmc.proposals import (
     SingleStackMove,
     SingleConstraintStackMove,
     SingleStackRandomHeightProposal,
+    GlobalSubcubeShuffleProposal,
+    MixedProposal,
 )
 from mcmc.chain import MCMCChain
 from mcmc.annealing import (
     AnnealingSchedule,
     LinearSchedule,
+    AdaptiveSchedule,
     run_simulated_annealing,
     GeometricSchedule,
     calibrate_initial_temperature,
@@ -38,6 +41,7 @@ def main(
     detailed_stats: bool = False,
     is_watched: bool = False,
     noisy_p: float = 0.2,
+    re_heat: bool = False,
 ) -> None:
     # ? Initialize random number generator
     rng = np.random.default_rng(rng_seed)
@@ -58,11 +62,9 @@ def main(
     energy_model.initialize(state)
 
     # ? Initialize proposal mechanism
-    proposal = (
-        SingleStackRandomHeightProposal(N)
-        if isinstance(state, StackState)
-        else SingleConstraintStackSwapProposal(N)
-    )
+    # proposal = MixedProposal(N, p_shuffle=0.0001, p_swap=0.2) seed 42 to have 0
+    proposal = MixedProposal(N, p_shuffle=0.0001, p_swap=-1)
+
     # ? Initialize MCMC chain
     mcmc_chain = MCMCChain(state=state, energy_model=energy_model, proposal=proposal)
     mcmc_chain_calibration = MCMCChain(
@@ -72,14 +74,20 @@ def main(
     #     mcmc_chain_calibration, target_acceptance_rate=0.85, n_samples=5000, rng=rng
     # )
     print(f"Calibrated initial temperature: T0 = {T_initial:.4f}")
-
     # ? Define annealing schedule
     if T_initial is not None and alpha is not None and max_steps is not None:
-        annealing_schedule = GeometricSchedule(
-            T_initial=T_initial,
-            alpha=alpha,
-            max_steps=max_steps,
-        )
+        if re_heat == True:
+            annealing_schedule = AdaptiveSchedule(
+                T_initial=T_initial,
+                alpha=alpha,
+                reheat_ratio=0.2,
+                stagnation_limit=20000,
+                max_steps=max_steps,
+            )
+        else:
+            annealing_schedule = GeometricSchedule(
+                T_initial=T_initial, alpha=alpha, max_steps=max_steps
+            )
     else:
         print(
             "You must provide T_initial, alpha, and max_steps for geometric annealing !"
@@ -94,6 +102,7 @@ def main(
             verbose_every,
             detailed_stats,
             is_watched,
+            re_heat,
         )
     except Exception as e:
         print(f"Simulated Annealing failed with error: {e}")
@@ -187,6 +196,12 @@ if __name__ == "__main__":
         default=0.2,
         help="Probability parameter for noisy_latin_square initialization (only used if mode_init is 'noisy_latin_square')",
     )
+    parser.add_argument(
+        "--re_heat",
+        type=bool,
+        default=False,
+        help="Use adaptive schedule with re-heating",
+    )
     args = parser.parse_args()
 
     max_workers = (
@@ -212,6 +227,7 @@ if __name__ == "__main__":
             "verbose_every": args.verbose_every,
             "detailed_stats": args.stats,
             "is_watched": should_be_watched,
+            "re_heat": args.re_heat,
         }
         # Adding noisy_p only if needed
         if args.mode_init == "noisy_latin_square":
