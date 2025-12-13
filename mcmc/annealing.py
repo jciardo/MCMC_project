@@ -8,6 +8,28 @@ import numpy as np
 from tqdm import tqdm
 
 
+class DummyPbar:
+    """A dummy progress bar that does nothing."""
+
+    def __init__(self, total=None, desc=None):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    def update(self, n=1):
+        pass
+
+    def set_postfix(self, ordered_dict=None, refresh=True):
+        pass
+
+    def close(self):
+        pass
+
+
 class AnnealingSchedule(ABC):
     """
     Classe abstraite définissant l'interface pour tout calendrier de refroidissement.
@@ -82,7 +104,6 @@ class LinearSchedule(AnnealingSchedule):
 
     def is_finished(self) -> bool:
         return self._current_T <= self.min_temp
-    
 
 
 @dataclass
@@ -91,26 +112,26 @@ class AdaptiveSchedule(AnnealingSchedule):
     alpha: float
     min_temp: float = 0.001
     max_steps: int = 1000000
-    
+
     # Paramètres
-    stagnation_limit: int = 8000   
-    reheat_ratio: float = 0.3      
-    
+    stagnation_limit: int = 8000
+    reheat_ratio: float = 0.3
+
     # Internal State
     _current_T: float = field(init=False)
     _stagnation_counter: int = field(init=False, default=0)
     _improving_streak: bool = field(init=False, default=False)
     _max_steps: int = field(init=False)
     _current_step: int = field(init=False, default=0)
-    
+
     # --- AJOUT CRUCIAL ---
-    _local_best_energy: float = field(init=False, default=float('inf'))
+    _local_best_energy: float = field(init=False, default=float("inf"))
 
     def __post_init__(self):
         self._current_T = self.T_initial
         self._max_steps = self.max_steps
         self._current_step = 0
-        self._local_best_energy = float('inf')
+        self._local_best_energy = float("inf")
 
     def get_temperature(self) -> float:
         return self._current_T
@@ -128,20 +149,20 @@ class AdaptiveSchedule(AnnealingSchedule):
 
     def step(self) -> None:
         self._current_step += 1
-        
+
         # Cruising
         if self._improving_streak:
-            return 
+            return
 
         # Reheating
         if self._stagnation_counter > self.stagnation_limit:
             # Reset Temperature
             self._current_T = self.T_initial * self.reheat_ratio
-            
+
             # --- RESET VITAL ---
             # On oublie le record précédent, on veut juste voir si on s'améliore DANS LE FUTUR
             self._stagnation_counter = 0
-            self._local_best_energy = float('inf') 
+            self._local_best_energy = float("inf")
             return
 
         # Normal Cooling
@@ -190,14 +211,15 @@ def run_simulated_annealing(
             mcmc_chain.step(rng, T)
 
             # 3. Update the temperature for the next iteration
-            if(re_heat == True):
-                schedule.update_metrics(mcmc_chain.energy_model.current_energy, 
-                                        best_energy)
+            if re_heat == True:
+                schedule.update_metrics(
+                    mcmc_chain.energy_model.current_energy, best_energy
+                )
             schedule.step()
 
             # Collect stats at every step
             current_energy = mcmc_chain.energy_model.current_energy
-            if(current_energy < best_energy): 
+            if current_energy < best_energy:
                 best_energy = current_energy
 
             attacked = mcmc_chain.energy_model.count_attacked_queens(mcmc_chain.state)
@@ -272,7 +294,7 @@ def calibrate_initial_temperature(
 
         # 2. Apply the proposed move (Must handle ALL move types)
         # --- CORRECTION ICI : Gestion dynamique des types de mouvements ---
-        
+
         if isinstance(move, SingleStackMove):
             energy_model.apply_move(
                 state=current_state,
@@ -281,7 +303,7 @@ def calibrate_initial_temperature(
                 k_new=move.k_new,
                 delta_E=delta_E,
             )
-            
+
         elif isinstance(move, SingleConstraintStackMove):
             energy_model.apply_move(
                 state=current_state,
@@ -292,18 +314,18 @@ def calibrate_initial_temperature(
                 k2=move.k2,
                 delta_E=delta_E,
             )
-            
+
         elif isinstance(move, BlockShuffleMove):
             # Application manuelle pour le Shuffle
             for (i, j), k_new in zip(move.indices, move.new_heights):
-                if hasattr(current_state, 'stacks'):
-                    current_state.stacks[i-1][j-1] = k_new
-                elif hasattr(current_state, 'set_height'):
+                if hasattr(current_state, "stacks"):
+                    current_state.stacks[i - 1][j - 1] = k_new
+                elif hasattr(current_state, "set_height"):
                     current_state.set_height(i, j, k_new)
             # Re-sync energy model
             energy_model.initialize(current_state)
 
-        # Note: On n'a plus besoin de re-initialize systématique ici sauf pour le Shuffle 
+        # Note: On n'a plus besoin de re-initialize systématique ici sauf pour le Shuffle
         # car apply_move le fait pour les autres.
 
     # --- 2. T0 Calculation ---
