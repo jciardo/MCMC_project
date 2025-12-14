@@ -4,18 +4,18 @@ This repository implements a solver for the 3D $N^2$-queens problem (on an $N \t
 
 ## 1. Code Structure
 
-The project is organized in a modular fashion:
+The project is organized as follows:
 
-*   **`main.py`**: The main entry point. Handles argument parsing, simulation initialization, parallel execution, and results plotting.
+*   **`main.py`**: Entry point for running simulations. Parses command-line arguments and orchestrates the MCMC process.
+*   **`state_space/`**: Defines the state space and board representation.
+    *   `geometry.py`: Defines the 3D grid geometry and precomputes all the attack lines for queens on the board.
+    *   `states.py`: Defines the different state representation `StackState` and `ConstraintState`. Also includes their initialization methods (random, noisy latin square, etc.) and methods to apply moves.
 *   **`energy/`**: Contains the energy model.
-    *   `energy_model.py`: Defines the cost function (Hamiltonian) which counts the number of alignments (attacks) between queens.
+    *   `energy_model.py`: Defines the energy function. It counts the number of conflicts (attacking queens) in the 3D grid. We also have the logic to compute the moves from proposals at each step. There is also a function to compute the number of attacked queens.
 *   **`mcmc/`**: Core of the MCMC algorithm.
-    *   `proposals.py`: Defines possible moves to explore the state space (Shuffle, Swap, Random Height, etc.).
-    *   `chain.py`: Manages the Markov Chain logic and Metropolis-Hastings acceptance/rejection criteria.
-    *   `annealing.py`: Implements cooling schedules (Linear, Geometric, Adaptive) for simulated annealing.
-*   **`state_space/`**: Problem representation.
-    *   `geometry.py`: Defines the 3D grid and line indices.
-    *   `states.py`: Defines data structures for representing the board state and initialization methods. 
+    *   `proposals.py`: Defines various proposal mechanisms to suggest new states, including single stack height changes, constraint-respecting swaps, and block shuffles. 
+    *   `chain.py`: Defines the MCMC chain structure, including state transitions and acceptance criteria.
+    *   `annealing.py`: Implements cooling schedules (Linear, Geometric, Adaptive) for simulated annealing. It also contains the main MCMC loop that iteratively proposes moves, evaluates them, and updates the state.
 *   **`utils/`**: Utility functions.
     *   `plot_utils.py`: Tools for visualizing energy evolution and the final 3D configuration.
 
@@ -29,6 +29,28 @@ The code supports:
 *   Various initialization modes (random, noisy latin square, etc.).
 *   Strong constraints (e.g., exactly one queen per vertical column).
 *   Running multiple simulations in parallel to leverage multi-core processors.
+
+## 3. Parameters review
+
+To model the different approaches, we had to define several parameters and hyperparameters:
+
+- **$N$**: the dimension of the problem.
+- **$max\_steps$**: the maximum number of steps allowed for the MCMC algorithm. The algorithm stops earlier if a zero-energy state is reached.
+- **$T_0$**: the initial temperature used for simulated annealing.
+- **$\alpha$**: the annealing coefficient.
+- **`state`**: the choice between `StackState` and `ConstraintStackState`, corresponding respectively to the Matrix and Column-Restricted state spaces.
+- **`mode_init`**: the initialization mode for the state. We implemented the following options:
+  - **Random**: a fully random initialization without any constraint.
+  - **Random Latin Square**: for any given column $(i,*)$, we ensure that all heights $k$ are different, enforcing the constraint that all queens in $(i,*)$ have distinct heights.
+  - **Noisy Latin Square**: this method is motivated by the fact that the previous initialization may be too constrained. We first generate a Random Latin Square initialization, then perturb each position $(i,j)$ with probability $p$ by replacing its height with a random value in $\{1, \ldots, N\}$.
+  - **Layer-Balanced Random**: heights in $\{1, \ldots, N\}$ are assigned to each $(i,j)$ with a bias toward using each height approximately $N$ times overall, without enforcing any row- or column-wise permutation constraints.
+
+  While all these initializations are possible for `StackState`, we only allowed Random Latin Square for `ConstraintStackState` because of the nature of this state.
+
+- **`noisy_p`**: the parameter controlling the perturbation probability $p$ used in the Noisy Latin Square initialization.
+- **`re_heat`**: a parameter enabling reheating, following the strategy described in Section II.C.
+- **`n_simulations`**: for running simulations in parallel (if possible).
+
 
 ## 3. How to Run
 

@@ -32,22 +32,22 @@ class DummyPbar:
 
 class AnnealingSchedule(ABC):
     """
-    Classe abstraite définissant l'interface pour tout calendrier de refroidissement.
+    Abstract base class for annealing schedules.
     """
 
     @abstractmethod
     def get_temperature(self) -> float:
-        """Retourne la température actuelle."""
+        """Return the current temperature."""
         pass
 
     @abstractmethod
     def step(self) -> None:
-        """Met à jour la température pour l'itération suivante."""
+        """Advance the schedule by one step."""
         pass
 
     @abstractmethod
     def is_finished(self) -> bool:
-        """Indique si le processus de recuit doit s'arrêter."""
+        """Return True if the schedule is finished."""
         pass
 
 
@@ -66,7 +66,7 @@ class GeometricSchedule(AnnealingSchedule):
 
     def __post_init__(self):
         if not (0 < self.alpha < 1):
-            raise ValueError("Alpha doit être entre 0 et 1.")
+            raise ValueError("Alpha must be in (0, 1) for cooling.")
         self._current_T = self.T_initial
 
     def get_temperature(self) -> float:
@@ -84,7 +84,7 @@ class GeometricSchedule(AnnealingSchedule):
 @dataclass
 class LinearSchedule(AnnealingSchedule):
     """
-    T(k+1) = T(k) - decremenet
+    T(k+1) = T(k) - decrement
     """
 
     T_initial: float
@@ -113,7 +113,7 @@ class AdaptiveSchedule(AnnealingSchedule):
     min_temp: float = 0.001
     max_steps: int = 1000000
 
-    # Paramètres
+    # Parameters for stagnation detection
     stagnation_limit: int = 8000
     reheat_ratio: float = 0.3
 
@@ -124,7 +124,6 @@ class AdaptiveSchedule(AnnealingSchedule):
     _max_steps: int = field(init=False)
     _current_step: int = field(init=False, default=0)
 
-    # --- AJOUT CRUCIAL ---
     _local_best_energy: float = field(init=False, default=float("inf"))
 
     def __post_init__(self):
@@ -137,8 +136,7 @@ class AdaptiveSchedule(AnnealingSchedule):
         return self._current_T
 
     def update_metrics(self, current_energy: float, global_best_energy: float) -> None:
-        # On compare par rapport au LOCAL best (depuis le dernier reheat)
-        # pour savoir si on est en train de descendre ou si on est bloqué.
+
         if current_energy < self._local_best_energy:
             self._local_best_energy = current_energy
             self._stagnation_counter = 0
@@ -159,8 +157,6 @@ class AdaptiveSchedule(AnnealingSchedule):
             # Reset Temperature
             self._current_T = self.T_initial * self.reheat_ratio
 
-            # --- RESET VITAL ---
-            # On oublie le record précédent, on veut juste voir si on s'améliore DANS LE FUTUR
             self._stagnation_counter = 0
             self._local_best_energy = float("inf")
             return
@@ -293,7 +289,6 @@ def calibrate_initial_temperature(
             energy_increases.append(delta_E)
 
         # 2. Apply the proposed move (Must handle ALL move types)
-        # --- CORRECTION ICI : Gestion dynamique des types de mouvements ---
 
         if isinstance(move, SingleStackMove):
             energy_model.apply_move(
@@ -316,7 +311,6 @@ def calibrate_initial_temperature(
             )
 
         elif isinstance(move, BlockShuffleMove):
-            # Application manuelle pour le Shuffle
             for (i, j), k_new in zip(move.indices, move.new_heights):
                 if hasattr(current_state, "stacks"):
                     current_state.stacks[i - 1][j - 1] = k_new
@@ -325,10 +319,6 @@ def calibrate_initial_temperature(
             # Re-sync energy model
             energy_model.initialize(current_state)
 
-        # Note: On n'a plus besoin de re-initialize systématique ici sauf pour le Shuffle
-        # car apply_move le fait pour les autres.
-
-    # --- 2. T0 Calculation ---
     if not energy_increases:
         print("Warning: No energy-increasing moves found. Defaulting T0 to 10.0.")
         return 10.0

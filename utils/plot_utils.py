@@ -31,7 +31,7 @@ def plot_results(
     # --- Aggregate Calculation and Winner Identification ---
     final_energies = np.array([r["energy"][-1] for r in results])
 
-    # 🏆 Identify the Global Winner and Loser Indices
+    # Identify the Global Winner and Loser Indices
     winner_index = np.argmin(final_energies)
     loser_index = np.argmax(final_energies)
 
@@ -61,7 +61,7 @@ def plot_results(
     if has_aggregate:
         ax_energy.plot(mean_energy, color="red", linewidth=2, label="Mean Energy")
 
-    # 🥇 Highlight the BEST RUN (Global Winner)
+    # Highlight the BEST RUN (Global Winner)
     winner_energy = results[winner_index]["energy"]
     ax_energy.plot(
         winner_energy,
@@ -71,7 +71,7 @@ def plot_results(
         label=f"BEST Run (Seed {results[winner_index].get('seed', 'N/A')} - Final E={final_energies[winner_index]:.2f})",
     )
 
-    # 💀 Highlight the WORST RUN (Global Loser)
+    # Highlight the WORST RUN (Global Loser)
     loser_energy = results[loser_index]["energy"]
     ax_energy.plot(
         loser_energy,
@@ -100,7 +100,7 @@ def plot_results(
     if has_aggregate:
         ax_queens.plot(mean_queens, color="navy", linewidth=2, label="Mean Conflicts")
 
-    # 🥇 Highlight the BEST RUN (Conflict Trajectory)
+    # Highlight the BEST RUN (Conflict Trajectory)
     winner_queens = results[winner_index]["attacked_queens"]
     ax_queens.plot(
         winner_queens,
@@ -110,7 +110,7 @@ def plot_results(
         label=f"BEST Run Trajectory, final numbers: {winner_queens[-1]:.2f}",
     )
 
-    # 💀 Highlight the WORST RUN (Conflict Trajectory)
+    # Highlight the WORST RUN (Conflict Trajectory)
     loser_queens = results[loser_index]["attacked_queens"]
     ax_queens.plot(
         loser_queens,
@@ -140,6 +140,7 @@ def plot_results(
     if plot_cube:
         fig = plt.figure(figsize=(8, 8))
         ax = fig.add_subplot(111, projection="3d")
+
         queen_positions = results[winner_index]["positions"][-1]
         cube_size = N
         edges = [
@@ -229,9 +230,6 @@ def plot_results(
         ax.set_xlabel("X")
         ax.set_ylabel("Y")
         ax.set_zlabel("Z")
-        ax.set_title(
-            f"3D Cube Representation of Best Solution for N = {N}", fontsize=14
-        )
 
         from matplotlib.lines import Line2D
 
