@@ -63,16 +63,16 @@ def main(
 
     # ? Initialize proposal mechanism
     # proposal = MixedProposal(N, p_shuffle=0.0001, p_swap=0.2) seed 42 to have 0
-    proposal = MixedProposal(N, p_shuffle=0.0001, p_swap=-1)
+    proposal = MixedProposal(N, p_shuffle=0.000001, p_swap=-1)
 
     # ? Initialize MCMC chain
     mcmc_chain = MCMCChain(state=state, energy_model=energy_model, proposal=proposal)
     mcmc_chain_calibration = MCMCChain(
         state=state, energy_model=energy_model, proposal=proposal
     )
-    T_initial = calibrate_initial_temperature(
+    '''T_initial = calibrate_initial_temperature(
         mcmc_chain_calibration, target_acceptance_rate=0.85, n_samples=5000, rng=rng
-    )
+    )'''
     print(f"Calibrated initial temperature: T0 = {T_initial:.4f}")
     # ? Define annealing schedule
     if T_initial is not None and alpha is not None and max_steps is not None:
@@ -199,7 +199,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--re_heat",
         type=bool,
-        default=False,
+        default=True,
         help="Use adaptive schedule with re-heating",
     )
     args = parser.parse_args()
@@ -257,5 +257,5 @@ if __name__ == "__main__":
         state_type=args.state_type,
         results=results,
         noisy_p=args.noisy_p,
-        plot_cube=True,
+        plot_cube=False,
     )

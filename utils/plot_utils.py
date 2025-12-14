@@ -14,6 +14,7 @@ def plot_results(
     noisy_p: float = None,
     plot_cube: bool = False,
     use_symbols: bool = True,
+    only_energy:bool = True,
 ) -> None:
     """
     Plots the results from multiple Simulated Annealing runs.
@@ -25,7 +26,8 @@ def plot_results(
     """
 
     # 1. Set Plot Style
-    plt.style.use("seaborn-v0_8-darkgrid")
+    #plt.style.use("seaborn-v0_8-darkgrid")
+    plt.style.use("default")
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
     # --- Aggregate Calculation and Winner Identification ---
@@ -126,15 +128,48 @@ def plot_results(
     ax_queens.legend(loc="upper right", fontsize=8)
     ax_queens.grid(True, linestyle="--", alpha=0.7)
 
-    title = (
+    '''title = (
         f"Simulated Annealing Results for {N}-Stacks {state_type if state_type!='stack'else ""} Problem, with {len(results)} simulations and '{mode_init}' Initialization"
         if mode_init != "noisy_latin_square"
         else f"Simulated Annealing Results for {N}-Stacks {state_type if state_type!='stack'else ''} Problem, with {len(results)} simulations and {mode_init} Initialization (p={noisy_p})"
+    )'''
+    state_label = state_type if state_type != "stack" else ""
+    if mode_init != "noisy_latin_square":
+        init_label = f"'{mode_init}' Initialization"
+    else:
+        init_label = f"{mode_init} Initialization (p={noisy_p})"
+
+    title = (
+        f"Simulated Annealing Results for {N}-Stacks {state_label} "
+        f"Problem, with {len(results)} simulations and {init_label}"
     )
 
     fig.suptitle(title, fontsize=16)
 
     plt.tight_layout()
+    if only_energy :
+        #! SAVE ONLY Energy vs Steps
+        #! Minimal fix but very verbose
+        fig_energy, ax = plt.subplots(figsize=(7, 5))
+
+        for res in results:
+            ax.plot(res["energy"], color="gray", alpha=0.08, linewidth=0.8)
+
+        ax.plot(winner_energy, color="green", linewidth=0.8, label="Best Run", alpha=0.35)
+        ax.plot(loser_energy, color="purple", linestyle="--", linewidth=0.8, label="Worst Run", alpha=0.35)
+
+        if has_aggregate:
+            ax.plot(mean_energy, color="firebrick", linewidth=2, label="Mean Energy")
+
+        #?ax.set_title("Energy Evolution Across Simulations") #? Not for the report
+        ax.set_xlabel("Steps")
+        ax.set_ylabel("Energy")
+        #ax.grid(True, linestyle="--", alpha=0.7)
+        ax.legend()
+
+        fig_energy.tight_layout()
+        fig_energy.savefig("plots/energy_vs_steps.png", dpi=300)
+        plt.close(fig_energy)
     plt.show()
     # Optionally plot the 3D cube of the best solution
     if plot_cube:
