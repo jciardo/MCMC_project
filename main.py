@@ -73,10 +73,10 @@ def main(
     )
 
     #! HERE REMOVE COMMENTS OR NOT BASED ON THE START AND REHEAT DESIRED QUANTITY 
-    '''
+    
     T_initial = calibrate_initial_temperature(
          mcmc_chain_calibration, target_acceptance_rate=0.85, n_samples=5000, rng=rng
-    )'''
+    )
     #!!!!!!!!!
     #T_initial = 100
 

@@ -200,10 +200,12 @@ def run_simulated_annealing(
     else:
         pbar_context = DummyPbar()
 
+    count = 0
     # The loop continues as long as the cooling schedule dictates (T > T_min or steps < max_steps)
     with pbar_context as pbar:
         while not schedule.is_finished():
             # 1. Retrieve the current temperature T
+            count
             T = schedule.get_temperature()
 
             # 2. Perform one MCMC step (State transition with Metropolis acceptance)
@@ -218,7 +220,8 @@ def run_simulated_annealing(
 
             # Collect stats at every step
             current_energy = mcmc_chain.energy_model.current_energy
-
+            if (count % 5000) == 0:
+                print(f"Step {count}: T={T:.4f}, Energy={current_energy:.4f}")
             # positions = full configuration at this step (INTERNAL 1-based coords)
             positions = list(mcmc_chain.state.iter_queens())
             

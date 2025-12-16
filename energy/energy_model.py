@@ -1,7 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
 import numpy as np
-from typing import List
 
 from state_space.states import StackState, ConstraintStackState
 from state_space.geometry import Board, LineIndex
@@ -11,54 +10,40 @@ def nchoose2(n: int) -> int:
     return (n * (n - 1)) // 2
 
 
-
 @dataclass
 class EnergyModel:
     geometry: Board
     line_index: LineIndex
 
     def __post_init__(self):
-
-        #! Nb of lines
         L = len(self.line_index.lines)
-
-        #! Count the nb of queens on each line
         self.line_counts = np.zeros(L, dtype=int)
-
-        #! Tot energy
         self.current_energy = 0
-
-        
-    
-    def _is_black(self, i: int, j: int, k: int) -> bool:
-        return ((i + j + k) & 1) == 1
 
     def initialize(self, state: StackState | ConstraintStackState) -> None:
         """
         Compute line_counts and current_energy from scratch for this state
         """
-        # ? zero counts
         self.line_counts[:] = 0
 
-        self.black_count = 0
-
-        # ? count queens on each line
+        # Count queens on each line
         for i, j, k in state.iter_queens():
-
             cell_id = self.geometry.coord_to_id(i, j, k)
             for line_id in self.line_index.cell_to_lines[cell_id]:
-
                 self.line_counts[line_id] += 1
 
-        # ? computes energy
+        # Conflict energy
         energy = 0
         for c in self.line_counts:
             if c > 1:
                 energy += nchoose2(c)
 
-        self.current_energy = energy + 4 * self.black_count
+        # Position energy |x + y - 2z|
+        pos_energy = 0
+        for i, j, k in state.iter_queens():
+            pos_energy += abs(i + j - 2 * k)
 
-        #self.current_energy = energy
+        self.current_energy = energy + pos_energy
 
     def get_energy(self) -> int:
         return int(self.current_energy)
@@ -81,13 +66,16 @@ class EnergyModel:
         lid = self.line_index
         old_lines = [lid.cell_to_lines[cell] for cell in affected_cells_old]
         new_lines = [lid.cell_to_lines[cell] for cell in affected_cells_new]
-        old_set = set([line_id for lines in old_lines for line_id in lines])
-        new_set = set([line_id for lines in new_lines for line_id in lines])
+        old_set = set(line_id for lines in old_lines for line_id in lines)
+        new_set = set(line_id for lines in new_lines for line_id in lines)
+
         delta_E = 0
         for line_id in old_set.union(new_set):
-            in_old = line_id in old_set
-            in_new = line_id in new_set
-            delta_E += self._line_delta_energy(line_id, in_old, in_new)
+            delta_E += self._line_delta_energy(
+                line_id,
+                line_id in old_set,
+                line_id in new_set,
+            )
         return delta_E
 
     def delta_energy(
@@ -102,61 +90,69 @@ class EnergyModel:
         k2: int = None,
     ) -> int:
         """Energy change for a proposed move."""
+        board = self.geometry
+
         if isinstance(state, StackState):
             old_k = state.get_height(i, j)
             k_new_val = k_new if k_new is not None else old_k
             if k_new_val == old_k:
                 return 0
-            board = self.geometry
+
             cell_old = board.coord_to_id(i, j, old_k)
             cell_new = board.coord_to_id(i, j, k_new_val)
-            #return self._delta_energy_generic([cell_old], [cell_new])
+
             delta_conflicts = self._delta_energy_generic([cell_old], [cell_new])
 
-            # black-square delta: +4 if move goes white->black, -4 if black->white, 0 otherwise
-            old_black = ((i + j + old_k) & 1) == 1
-            new_black = ((i + j + k_new_val) & 1) == 1
-            delta_black = 4 * (int(new_black) - int(old_black))
+            old_pos = abs(i + j - 2 * old_k)
+            new_pos = abs(i + j - 2 * k_new_val)
 
-            return delta_conflicts + delta_black
+            return delta_conflicts + (new_pos - old_pos)
+
         elif isinstance(state, ConstraintStackState):
             k1_val = k1 if k1 is not None else state.get_height(i1, j)
             k2_val = k2 if k2 is not None else state.get_height(i2, j)
             if k1_val == k2_val:
                 return 0
-            board = self.geometry
+
             cell_1_old = board.coord_to_id(i1, j, k1_val)
             cell_2_old = board.coord_to_id(i2, j, k2_val)
             cell_1_new = board.coord_to_id(i1, j, k2_val)
             cell_2_new = board.coord_to_id(i2, j, k1_val)
-            return self._delta_energy_generic(
-                [cell_1_old, cell_2_old], [cell_1_new, cell_2_new]
+
+            delta_conflicts = self._delta_energy_generic(
+                [cell_1_old, cell_2_old],
+                [cell_1_new, cell_2_new],
             )
+
+            old_pos = (
+                abs(i1 + j - 2 * k1_val)
+                + abs(i2 + j - 2 * k2_val)
+            )
+            new_pos = (
+                abs(i1 + j - 2 * k2_val)
+                + abs(i2 + j - 2 * k1_val)
+            )
+
+            return delta_conflicts + (new_pos - old_pos)
 
     def _apply_move_generic(
         self,
         affected_cells_old: list[int],
         affected_cells_new: list[int],
-        delta_E: int = None,
+        delta_E: int,
     ) -> None:
         lid = self.line_index
         old_lines = [lid.cell_to_lines[cell] for cell in affected_cells_old]
         new_lines = [lid.cell_to_lines[cell] for cell in affected_cells_new]
-        old_set = set([line_id for lines in old_lines for line_id in lines])
-        new_set = set([line_id for lines in new_lines for line_id in lines])
-        if delta_E is None:
-            delta_E = 0
-            for line_id in old_set.union(new_set):
-                in_old = line_id in old_set
-                in_new = line_id in new_set
-                delta_E += self._line_delta_energy(line_id, in_old, in_new)
+        old_set = set(line_id for lines in old_lines for line_id in lines)
+        new_set = set(line_id for lines in new_lines for line_id in lines)
+
         for line_id in old_set.union(new_set):
-            in_old = line_id in old_set
-            in_new = line_id in new_set
-            if in_old and not in_new:
+            if line_id in old_set and line_id not in new_set:
                 self.line_counts[line_id] -= 1
-            elif in_new and not in_old:
+            elif line_id in new_set and line_id not in old_set:
                 self.line_counts[line_id] += 1
+
         self.current_energy += delta_E
 
     def apply_move(
@@ -171,45 +167,57 @@ class EnergyModel:
         k2: int = None,
         delta_E: int = None,
     ) -> None:
-        """
-        Apply the move proposed, updating line counts and current energy
-        """
+        board = self.geometry
+
         if isinstance(state, StackState):
             old_k = state.get_height(i, j)
             k_new_val = k_new if k_new is not None else old_k
             if k_new_val == old_k:
                 return
-            board = self.geometry
+
             cell_old = board.coord_to_id(i, j, old_k)
             cell_new = board.coord_to_id(i, j, k_new_val)
-            delta_black_count = int(self._is_black(i, j, k_new_val)) - int(self._is_black(i, j, old_k))
-            self.black_count += delta_black_count
 
             if delta_E is None:
-                # recompute total delta locally (conflicts + black)
                 delta_conflicts = self._delta_energy_generic([cell_old], [cell_new])
-                delta_E = delta_conflicts + 4 * delta_black_count
+                delta_pos = abs(i + j - 2 * k_new_val) - abs(i + j - 2 * old_k)
+                delta_E = delta_conflicts + delta_pos
 
             self._apply_move_generic([cell_old], [cell_new], delta_E)
-
-            #self._apply_move_generic([cell_old], [cell_new], delta_E)
             state.set_height(i, j, k_new_val)
+
         elif isinstance(state, ConstraintStackState):
             k1_val = k1 if k1 is not None else state.get_height(i1, j)
             k2_val = k2 if k2 is not None else state.get_height(i2, j)
             if k1_val == k2_val:
                 return
-            board = self.geometry
+
             cell_1_old = board.coord_to_id(i1, j, k1_val)
             cell_2_old = board.coord_to_id(i2, j, k2_val)
             cell_1_new = board.coord_to_id(i1, j, k2_val)
             cell_2_new = board.coord_to_id(i2, j, k1_val)
+
+            if delta_E is None:
+                delta_conflicts = self._delta_energy_generic(
+                    [cell_1_old, cell_2_old],
+                    [cell_1_new, cell_2_new],
+                )
+                delta_pos = (
+                    abs(i1 + j - 2 * k2_val)
+                    + abs(i2 + j - 2 * k1_val)
+                    - abs(i1 + j - 2 * k1_val)
+                    - abs(i2 + j - 2 * k2_val)
+                )
+                delta_E = delta_conflicts + delta_pos
+
             self._apply_move_generic(
-                [cell_1_old, cell_2_old], [cell_1_new, cell_2_new], delta_E
+                [cell_1_old, cell_2_old],
+                [cell_1_new, cell_2_new],
+                delta_E,
             )
             state.set_height(i1, j, k2_val)
             state.set_height(i2, j, k1_val)
-
+    
     def count_attacked_queens(self, state: StackState) -> int:
         """
         Returns the number of queens that lie on at least one line with >= 2 queens
@@ -222,53 +230,8 @@ class EnergyModel:
             cell_id = board.coord_to_id(i, j, k)
             lines = l_id.cell_to_lines[cell_id]
 
-            #! is this queen on any conflicting line?
+            # Is this queen on any conflicting line?
             if any(self.line_counts[line_id] > 1 for line_id in lines):
                 attacked += 1
 
         return attacked
-
-    def attacked_stats(self, state: StackState):
-        """
-        Compute more precise attack stats:
-        - attacked_queens: at least one attacker
-        - max_attacks: maximum number of attackers any queen has
-        - mean_attacks: mean number of attackers among attacked queens
-        - most_attacked_queen: coord of the queen or None
-
-        Returns : dict
-        """
-        board = self.geometry
-        l_id = self.line_index
-
-        attacked_queens = 0
-        total_attacks = 0
-        max_attacks = 0
-        most_attacked_queen = None
-
-        for i, j, k in state.iter_queens():
-            cell_id = board.coord_to_id(i, j, k)
-            lines = l_id.cell_to_lines[cell_id]
-
-            # ? count how many other queens attack this queen
-            attacks_here = 0
-            for line_id in lines:
-                n = self.line_counts[line_id]
-                if n > 1:
-                    attacks_here += n - 1
-
-            if attacks_here > 0:
-                attacked_queens += 1
-                total_attacks += attacks_here
-                if attacks_here > max_attacks:
-                    max_attacks = attacks_here
-                    most_attacked_queen = (i, j, k)
-
-        mean_attacks = total_attacks / attacked_queens if attacked_queens > 0 else 0.0
-
-        return {
-            "attacked_queens": attacked_queens,
-            "max_attacks": max_attacks,
-            "mean_attacks": mean_attacks,
-            "most_attacked_queen": most_attacked_queen,
-        }
