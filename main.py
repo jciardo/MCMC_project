@@ -71,6 +71,8 @@ def main(
     mcmc_chain_calibration = MCMCChain(
         state=state, energy_model=energy_model, proposal=proposal
     )
+
+    #! HERE REMOVE COMMENTS OR NOT BASED ON THE START AND REHEAT DESIRED QUANTITY 
     '''
     T_initial = calibrate_initial_temperature(
          mcmc_chain_calibration, target_acceptance_rate=0.85, n_samples=5000, rng=rng
@@ -312,12 +314,13 @@ if __name__ == "__main__":
         print("No successful simulations. Skipping plotting.")
     else:
         # ? Plot results
-        plot_results(
+        print('over')
+'''        plot_results(
             N=args.N,
             mode_init=args.mode_init,
             state_type=args.state_type,
             results=results,
             noisy_p=args.noisy_p,
             plot_cube=False,
-        )
+        )'''
 

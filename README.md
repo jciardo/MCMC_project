@@ -103,3 +103,16 @@ python main.py \
 ### Visualization
 
 At the end of the execution, the script will automatically generate plots showing the energy evolution and the final configuration of the queens.
+
+## Competition rules :
+
+N=$10$
+
+Send 2 files : Team_name1.txt
+               Team_name2.txt
+
+### Contest 1 :
+Total energy ; nb of conflicts + 4 for each occupied black square (i.e x + y + z =1(mod2))
+
+### Contest 2 :
+Total energy = nb of conflicts + for each occupied square  (x,y,z)  energy = |x+y+2z|

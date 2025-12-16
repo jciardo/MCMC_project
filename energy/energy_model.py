@@ -11,6 +11,7 @@ def nchoose2(n: int) -> int:
     return (n * (n - 1)) // 2
 
 
+
 @dataclass
 class EnergyModel:
     geometry: Board
@@ -27,12 +28,19 @@ class EnergyModel:
         #! Tot energy
         self.current_energy = 0
 
+        
+    
+    def _is_black(self, i: int, j: int, k: int) -> bool:
+        return ((i + j + k) & 1) == 1
+
     def initialize(self, state: StackState | ConstraintStackState) -> None:
         """
         Compute line_counts and current_energy from scratch for this state
         """
         # ? zero counts
         self.line_counts[:] = 0
+
+        self.black_count = 0
 
         # ? count queens on each line
         for i, j, k in state.iter_queens():
@@ -48,7 +56,9 @@ class EnergyModel:
             if c > 1:
                 energy += nchoose2(c)
 
-        self.current_energy = energy
+        self.current_energy = energy + 4 * self.black_count
+
+        #self.current_energy = energy
 
     def get_energy(self) -> int:
         return int(self.current_energy)
@@ -100,7 +110,15 @@ class EnergyModel:
             board = self.geometry
             cell_old = board.coord_to_id(i, j, old_k)
             cell_new = board.coord_to_id(i, j, k_new_val)
-            return self._delta_energy_generic([cell_old], [cell_new])
+            #return self._delta_energy_generic([cell_old], [cell_new])
+            delta_conflicts = self._delta_energy_generic([cell_old], [cell_new])
+
+            # black-square delta: +4 if move goes white->black, -4 if black->white, 0 otherwise
+            old_black = ((i + j + old_k) & 1) == 1
+            new_black = ((i + j + k_new_val) & 1) == 1
+            delta_black = 4 * (int(new_black) - int(old_black))
+
+            return delta_conflicts + delta_black
         elif isinstance(state, ConstraintStackState):
             k1_val = k1 if k1 is not None else state.get_height(i1, j)
             k2_val = k2 if k2 is not None else state.get_height(i2, j)
@@ -164,7 +182,17 @@ class EnergyModel:
             board = self.geometry
             cell_old = board.coord_to_id(i, j, old_k)
             cell_new = board.coord_to_id(i, j, k_new_val)
+            delta_black_count = int(self._is_black(i, j, k_new_val)) - int(self._is_black(i, j, old_k))
+            self.black_count += delta_black_count
+
+            if delta_E is None:
+                # recompute total delta locally (conflicts + black)
+                delta_conflicts = self._delta_energy_generic([cell_old], [cell_new])
+                delta_E = delta_conflicts + 4 * delta_black_count
+
             self._apply_move_generic([cell_old], [cell_new], delta_E)
+
+            #self._apply_move_generic([cell_old], [cell_new], delta_E)
             state.set_height(i, j, k_new_val)
         elif isinstance(state, ConstraintStackState):
             k1_val = k1 if k1 is not None else state.get_height(i1, j)
