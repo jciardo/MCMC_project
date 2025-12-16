@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Iterable, Tuple, Optional
 import numpy as np
+from pathlib import Path
+
 
 
 Coord3D = Tuple[int, int, int]  # ? (i, j, k)
@@ -204,6 +206,18 @@ class StackState(State):
         """
         assert 1 <= k <= self.N
         self.heights[i - 1, j - 1] = k
+
+    def state_to_xyz(state, N: int):
+        # Adapt `state.heights` to your actual attribute name.
+        H = state.heights  # shape (N, N), entries in {0,...,N-1}
+        coords = []
+        for x in range(N):
+            for y in range(N):
+                z = int(H[x, y])
+                if not (0 <= z < N):
+                    raise ValueError(f"Invalid z={z} at (x={x}, y={y}); expected 0..{N-1}")
+                coords.append((x, y, z))
+        return coords
 
 
 @dataclass

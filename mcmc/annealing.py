@@ -189,8 +189,11 @@ def run_simulated_annealing(
         "energy": [],
         "attacked_queens": [],
         "positions": [],
+        "best_energy": None,
+        "best_positions": None,
     }
     best_energy = mcmc_chain.energy_model.current_energy
+    best_positions = list(mcmc_chain.state.iter_queens())
 
     if is_watched:
         pbar_context = tqdm(total=schedule.max_steps, desc="Simulated Annealing")
@@ -215,8 +218,13 @@ def run_simulated_annealing(
 
             # Collect stats at every step
             current_energy = mcmc_chain.energy_model.current_energy
+
+            # positions = full configuration at this step (INTERNAL 1-based coords)
+            positions = list(mcmc_chain.state.iter_queens())
+            
             if current_energy < best_energy:
                 best_energy = current_energy
+                best_positions = positions #! added
 
             attacked = mcmc_chain.energy_model.count_attacked_queens(mcmc_chain.state)
             positions = list(mcmc_chain.state.iter_queens())
@@ -258,6 +266,8 @@ def run_simulated_annealing(
             pbar.update(1)
 
     print("Simulated Annealing complete.")
+    history["best_energy"] = best_energy
+    history["best_positions"] = best_positions
     pbar.close()
     return history
 
