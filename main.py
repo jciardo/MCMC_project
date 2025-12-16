@@ -72,13 +72,13 @@ def main(
         state=state, energy_model=energy_model, proposal=proposal
     )
 
-    #! HERE REMOVE COMMENTS OR NOT BASED ON THE START AND REHEAT DESIRED QUANTITY 
-    '''
+    #! HERE REMOVE COMMENTS OR NOT BASED ON THE START AND REHEAT DESIRED QUANTITY
+    """
     T_initial = calibrate_initial_temperature(
          mcmc_chain_calibration, target_acceptance_rate=0.85, n_samples=5000, rng=rng
-    )'''
+    )"""
     #!!!!!!!!!
-    #T_initial = 100
+    # T_initial = 100
 
     print(f"Calibrated initial temperature: T0 = {T_initial:.4f}")
     # ? Define annealing schedule
@@ -124,7 +124,7 @@ def main(
     try:
         write_queens_xyz(out_path, history["best_positions"], N)
     except Exception as e:
-        history["write_error"] = str(e) 
+        history["write_error"] = str(e)
     return history
 
 
@@ -151,11 +151,15 @@ def main(
     except AssertionError as e:
         print(f"!! Simulation Seed {seed} failed with error: {e}")
         return {"seed": seed, "error": str(e)}'''
+
+
 def run_single_simulation(args_dict: dict) -> dict:
     seed = args_dict["rng_seed"]
     try:
         args_dict["verbose_every"] = (
-            10000000 if args_dict.get("is_watched", False) else args_dict["verbose_every"]
+            10000000
+            if args_dict.get("is_watched", False)
+            else args_dict["verbose_every"]
         )
         print(f"--> Start simulation Seed {seed} on process {os.getpid()}")
 
@@ -173,6 +177,7 @@ def run_single_simulation(args_dict: dict) -> dict:
             f"<-- End simulation Seed {seed}. "
             f"Final E: {result['energy'][-1]:.4f}, Best E: {result['best_energy']:.4f}, "
             f"Final attacked: {result['attacked_queens'][-1]:.4f} "
+            f"Final black queens: {result['black_queens'][-1]:.4f} "
             f"on process {os.getpid()} in {len(result['energy'])} steps"
         )
         return result
@@ -298,29 +303,35 @@ if __name__ == "__main__":
 
     # Separate successful and failed runs
     ok_results = [
-        r for r in results
+        r
+        for r in results
         if isinstance(r, dict) and ("error" not in r) and ("energy" in r)
     ]
     failed_results = [
-        r for r in results
+        r
+        for r in results
         if not (isinstance(r, dict) and ("error" not in r) and ("energy" in r))
     ]
 
     if failed_results:
-        print(f"WARNING: {len(failed_results)} simulations failed and will be excluded from plots.")
-        print("Failed seeds:", [r.get("seed") for r in failed_results if isinstance(r, dict)])
+        print(
+            f"WARNING: {len(failed_results)} simulations failed and will be excluded from plots."
+        )
+        print(
+            "Failed seeds:",
+            [r.get("seed") for r in failed_results if isinstance(r, dict)],
+        )
 
     if not ok_results:
         print("No successful simulations. Skipping plotting.")
     else:
         # ? Plot results
-        print('over')
-'''        plot_results(
+        print("over")
+"""        plot_results(
             N=args.N,
             mode_init=args.mode_init,
             state_type=args.state_type,
             results=results,
             noisy_p=args.noisy_p,
             plot_cube=False,
-        )'''
-
+        )"""

@@ -11,7 +11,6 @@ def nchoose2(n: int) -> int:
     return (n * (n - 1)) // 2
 
 
-
 @dataclass
 class EnergyModel:
     geometry: Board
@@ -28,8 +27,6 @@ class EnergyModel:
         #! Tot energy
         self.current_energy = 0
 
-        
-    
     def _is_black(self, i: int, j: int, k: int) -> bool:
         return ((i + j + k) & 1) == 1
 
@@ -58,7 +55,7 @@ class EnergyModel:
 
         self.current_energy = energy + 4 * self.black_count
 
-        #self.current_energy = energy
+        # self.current_energy = energy
 
     def get_energy(self) -> int:
         return int(self.current_energy)
@@ -110,7 +107,7 @@ class EnergyModel:
             board = self.geometry
             cell_old = board.coord_to_id(i, j, old_k)
             cell_new = board.coord_to_id(i, j, k_new_val)
-            #return self._delta_energy_generic([cell_old], [cell_new])
+            # return self._delta_energy_generic([cell_old], [cell_new])
             delta_conflicts = self._delta_energy_generic([cell_old], [cell_new])
 
             # black-square delta: +4 if move goes white->black, -4 if black->white, 0 otherwise
@@ -182,7 +179,9 @@ class EnergyModel:
             board = self.geometry
             cell_old = board.coord_to_id(i, j, old_k)
             cell_new = board.coord_to_id(i, j, k_new_val)
-            delta_black_count = int(self._is_black(i, j, k_new_val)) - int(self._is_black(i, j, old_k))
+            delta_black_count = int(self._is_black(i, j, k_new_val)) - int(
+                self._is_black(i, j, old_k)
+            )
             self.black_count += delta_black_count
 
             if delta_E is None:
@@ -192,7 +191,7 @@ class EnergyModel:
 
             self._apply_move_generic([cell_old], [cell_new], delta_E)
 
-            #self._apply_move_generic([cell_old], [cell_new], delta_E)
+            # self._apply_move_generic([cell_old], [cell_new], delta_E)
             state.set_height(i, j, k_new_val)
         elif isinstance(state, ConstraintStackState):
             k1_val = k1 if k1 is not None else state.get_height(i1, j)
@@ -213,8 +212,10 @@ class EnergyModel:
     def count_attacked_queens(self, state: StackState) -> int:
         """
         Returns the number of queens that lie on at least one line with >= 2 queens
+        also add the number of queens on black squares multiplied by 4
         """
         attacked = 0
+        nb_black_queens = 0
         board = self.geometry
         l_id = self.line_index
 
@@ -225,8 +226,10 @@ class EnergyModel:
             #! is this queen on any conflicting line?
             if any(self.line_counts[line_id] > 1 for line_id in lines):
                 attacked += 1
+            if self._is_black(i, j, k):
+                nb_black_queens += 1
 
-        return attacked
+        return attacked, nb_black_queens
 
     def attacked_stats(self, state: StackState):
         """

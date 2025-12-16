@@ -191,6 +191,7 @@ def run_simulated_annealing(
         "positions": [],
         "best_energy": None,
         "best_positions": None,
+        "black_queens": [],
     }
     best_energy = mcmc_chain.energy_model.current_energy
     best_positions = list(mcmc_chain.state.iter_queens())
@@ -221,18 +222,21 @@ def run_simulated_annealing(
 
             # positions = full configuration at this step (INTERNAL 1-based coords)
             positions = list(mcmc_chain.state.iter_queens())
-            
+
             if current_energy < best_energy:
                 best_energy = current_energy
-                best_positions = positions #! added
+                best_positions = positions  #! added
 
-            attacked = mcmc_chain.energy_model.count_attacked_queens(mcmc_chain.state)
+            attacked, nb_black_queens = mcmc_chain.energy_model.count_attacked_queens(
+                mcmc_chain.state
+            )
             positions = list(mcmc_chain.state.iter_queens())
 
             history["temperature"].append(T)
             history["energy"].append(current_energy)
             history["attacked_queens"].append(attacked)
             history["positions"].append(positions)
+            history["black_queens"].append(nb_black_queens)
 
             # 4. Monitoring and Logging (every 1000 steps)
             if iteration % verbose_every == 0:
@@ -242,6 +246,7 @@ def run_simulated_annealing(
                         f"T={T:.4f}, "
                         f"Energy={current_energy:.4f}, "
                         f"Attacked Queens={attacked}"
+                        f", Black Queens={nb_black_queens}"
                     )
                 else:
                     attacked_stats = mcmc_chain.energy_model.attacked_stats(
@@ -254,6 +259,7 @@ def run_simulated_annealing(
                         f'Attacked Queens={attacked_stats["attacked_queens"]}, '
                         f'mean attack={attacked_stats["mean_attacks"]:.2f}, '
                         f'most attacked={attacked_stats["max_attacks"]:.2f}'
+                        f", Black Queens={nb_black_queens}"
                     )
 
                 # Early stopping condition if the perfect solution (E=0) is found
