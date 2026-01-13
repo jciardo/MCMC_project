@@ -126,10 +126,28 @@ def plot_results(
     ax_queens.legend(loc="upper right", fontsize=8)
     ax_queens.grid(True, linestyle="--", alpha=0.7)
 
-    title = (
+    '''if mode_init != "noisy_latin_square" :
+        title = f"Simulated Annealing Results for {N}-Stacks {state_type if state_type!='stack'else ""} Problem, with {len(results)} simulations and '{mode_init}' Initialization"
+    else : title = f"Simulated Annealing Results for {N}-Stacks {state_type if state_type!='stack'else ''} Problem, with {len(results)} simulations and {mode_init} Initialization (p={noisy_p})"'''
+        
+
+    '''title = (
         f"Simulated Annealing Results for {N}-Stacks {state_type if state_type!='stack'else ""} Problem, with {len(results)} simulations and '{mode_init}' Initialization"
-        if mode_init != "noisy_latin_square"
+        if mode_init != "noisy_latin_square":
         else f"Simulated Annealing Results for {N}-Stacks {state_type if state_type!='stack'else ''} Problem, with {len(results)} simulations and {mode_init} Initialization (p={noisy_p})"
+    )'''
+
+    title = (
+    f"Simulated Annealing Results for {N}-Stacks "
+    f"{state_type if state_type != 'stack' else ''} "
+    f"Problem, with {len(results)} simulations and "
+    f"'{mode_init}' Initialization"
+    if mode_init != "noisy_latin_square"
+    else
+    f"Simulated Annealing Results for {N}-Stacks "
+    f"{state_type if state_type != 'stack' else ''} "
+    f"Problem, with {len(results)} simulations and "
+    f"{mode_init} Initialization (p={noisy_p})"
     )
 
     fig.suptitle(title, fontsize=16)
